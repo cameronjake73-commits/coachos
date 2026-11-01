@@ -2,6 +2,8 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function middleware(request: NextRequest) {
+  // Not configured yet (no Supabase env vars): let public pages render instead of crashing every request.
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return NextResponse.next();
   const headers = new Headers(request.headers);
   headers.set('x-pathname', request.nextUrl.pathname);
   let response = NextResponse.next({ request: { headers } });
@@ -20,7 +22,12 @@ export async function middleware(request: NextRequest) {
       },
     },
   );
-  const { data: { user } } = await supabase.auth.getUser();
+  let user = null;
+  try {
+    ({ data: { user } } = await supabase.auth.getUser());
+  } catch (e) {
+    console.error('auth check failed', e);
+  }
   const path = request.nextUrl.pathname;
   if (!user && (path.startsWith('/coach') || path.startsWith('/app'))) {
     const url = request.nextUrl.clone();
