@@ -6,9 +6,10 @@ import { PLANS, type PaidPlan } from '@/lib/plans';
 export async function POST(request: Request) {
   const form = await request.formData();
   const plan = String(form.get('plan')) as PaidPlan;
-  if (!(plan in PLANS)) return NextResponse.json({ error: 'Unknown plan' }, { status: 400 });
+  const back = (msg: string) => NextResponse.redirect(new URL(`/coach/billing?error=${encodeURIComponent(msg)}`, request.url), 303);
+  if (!(plan in PLANS)) return back('Unknown plan');
   const priceId = process.env[PLANS[plan].envPrice];
-  if (!priceId) return NextResponse.json({ error: `${PLANS[plan].envPrice} is not set` }, { status: 500 });
+  if (!priceId || !process.env.STRIPE_SECRET_KEY) return back('Payments are not connected yet.');
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -18,6 +19,7 @@ export async function POST(request: Request) {
 
   const stripe = getStripe();
   const appUrl = process.env.NEXT_PUBLIC_APP_URL!;
+  try {
 
   // Existing subscribers change plan in the Billing Portal instead of creating a second subscription.
   if (coach.stripe_subscription_id && coach.stripe_customer_id) {
@@ -39,4 +41,8 @@ export async function POST(request: Request) {
     cancel_url: `${appUrl}/coach/billing`,
   });
   return NextResponse.redirect(session.url!, 303);
+  } catch (e) {
+    console.error('stripe checkout failed', e);
+    return back('Could not open checkout. Please try again.');
+  }
 }

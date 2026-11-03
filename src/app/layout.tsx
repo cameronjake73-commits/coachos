@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import '@fontsource-variable/inter';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -6,7 +7,7 @@ export const metadata: Metadata = {
   description: 'Spend less time managing clients. Deliver more personalised coaching. Keep your clients engaged.',
 };
 
-export const viewport: Viewport = { themeColor: '#090d1c', width: 'device-width', initialScale: 1 };
+export const viewport: Viewport = { themeColor: '#0a0b13', width: 'device-width', initialScale: 1, viewportFit: 'cover' };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

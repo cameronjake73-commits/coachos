@@ -33,7 +33,8 @@ Clients use a **mobile web app** at `/app`. They can "Add to Home Screen" (PWA m
 
 ### 1. Supabase
 1. Create a project at supabase.com. **Pick a UK/EU region** (e.g. London `eu-west-2`) for UK GDPR.
-2. SQL Editor → run `supabase/migrations/0001_schema.sql`, then `0002_seed_exercises.sql`, then `0003_notifications.sql` (in that order).
+2. SQL Editor → run `supabase/migrations/0001_schema.sql`, then `0002_seed_exercises.sql`, `0003_notifications.sql` and `0004_coaching_upgrade.sql` (in that order).
+   Already set up? Just run `0004_coaching_upgrade.sql` once. It only adds columns, nothing is deleted.
 3. Authentication → URL Configuration: set **Site URL** to your app URL and add `https://YOUR-DOMAIN/auth/callback` to Redirect URLs.
 4. Authentication → Providers → Email: keep "Confirm email" on for coaches. Clients are confirmed automatically via their invite link.
 5. Project Settings → API: copy the URL, `anon` key and `service_role` key.
@@ -129,3 +130,10 @@ src/lib/risk.ts        explainable risk scoring rules
 src/lib/ai.ts          AI check-in analysis prompt + validation
 supabase/migrations    database schema, RLS policies, storage, exercise seed
 ```
+
+## AI features
+
+AI is optional. With no `ANTHROPIC_API_KEY`, COACHOS uses its built-in rules (risk scoring, missed check-in
+tracking, priorities and message templates). With a key it adds: check-in summaries and drafted replies,
+client progress summaries, AI-drafted outreach messages and a weekly priorities brief. Every AI output
+separates what the data shows from suggestions, uses first names only, and nothing is sent without the coach.

@@ -2,245 +2,220 @@ import Link from 'next/link';
 import { requireCoach } from '@/lib/auth';
 import { Avatar } from '@/components/avatar';
 import { Icon } from '@/components/icons';
-import { BarChart, Donut, LineChart } from '@/components/charts';
+import { LineChart } from '@/components/charts';
 import { SubmitButton } from '@/components/submit-button';
-import { refreshAllRisk } from './actions';
+import { Alert, Badge, Card, CardLink, EmptyState, Metric, RiskBadge } from '@/components/ui';
+import { generateBrief, refreshAllRisk } from './actions';
 import { loadDashboard, recommendedAction } from '@/lib/dashboard-data';
-import { daysSince, daysUntil, gbp, timeAgo } from '@/lib/format';
-import type { Client } from '@/lib/types';
+import { DAYS, relativeDay } from '@/lib/coaching';
+import { aiEnabled } from '@/lib/ai';
+import { gbp, timeAgo } from '@/lib/format';
 
 function greeting() {
   const h = Number(new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hour12: false, timeZone: 'Europe/London' }).format(new Date()));
   return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
 }
 
-function Delta({ value, suffix = '' }: { value: number | null; suffix?: string }) {
-  if (value == null) return <span className="text-xs text-slate-500">{suffix || ' '}</span>;
-  const up = value >= 0;
-  return (
-    <span className={`inline-flex items-center gap-1 text-sm font-medium ${up ? 'text-emerald-700' : 'text-red-700'}`}>
-      <Icon name={up ? 'arrowUp' : 'arrowDown'} className="h-3.5 w-3.5" strokeWidth={2.4} />{up ? '+' : ''}{value}%
-      {suffix && <span className="font-normal text-slate-500">{suffix}</span>}
-    </span>
-  );
-}
+type Task = { icon: string; tone: string; title: string; detail: string; href: string; cta: string };
 
-function StatCard({ icon, tone, label, value, children }: { icon: React.ReactNode; tone: string; label: string; value: React.ReactNode; children?: React.ReactNode }) {
-  return (
-    <div className="card flex items-center gap-5 p-5">
-      <div className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-full ${tone}`}>{icon}</div>
-      <div className="min-w-0">
-        <div className="text-sm text-slate-600">{label}</div>
-        <div className="mt-0.5 text-3xl font-semibold tracking-tight">{value}</div>
-        <div className="mt-1">{children}</div>
-      </div>
-    </div>
-  );
-}
-
-function Pill({ tone, children }: { tone: 'red' | 'orange' | 'blue' | 'purple'; children: React.ReactNode }) {
-  const t = { red: 'bg-red-600 text-white', orange: 'bg-amber-600 text-white', blue: 'bg-sky-600 text-white', purple: 'bg-brand-600 text-white' }[tone];
-  return <span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${t}`}>{children}</span>;
-}
-
-function attentionMeta(c: Client, lastCheckin: string | undefined) {
-  const since = daysSince(lastCheckin);
-  if (c.payment_status === 'overdue') return { pill: <Pill tone="blue">Overdue</Pill>, sub: 'Payment overdue', action: 'Message', href: `/coach/clients/${c.id}?tab=messages&draft=1` };
-  if (c.risk_level === 'high') return { pill: <Pill tone="red">At Risk</Pill>, sub: since != null && since >= 8 ? `Last check-in ${since}d ago` : c.risk_reasons[0] ?? 'Engagement dropping', action: 'Contact', href: `/coach/clients/${c.id}?tab=messages&draft=1` };
-  return { pill: <Pill tone="orange">Needs Attention</Pill>, sub: c.risk_reasons[0] ?? 'Engagement dipping', action: 'Review', href: `/coach/clients/${c.id}` };
-}
-
-export default async function CoachDashboard() {
+export default async function CoachDashboard({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+  const sp = await searchParams;
   const { supabase, coach, user } = await requireCoach();
   const [{ data: profile }, d] = await Promise.all([
     supabase.from('profiles').select('full_name').eq('id', user.id).single(),
-    loadDashboard(supabase, coach.id),
+    loadDashboard(supabase, coach.id, coach.checkin_day),
   ]);
-  const first = (profile?.full_name || 'Coach').split(' ')[0];
-  const lastBy = new Map<string, string>();
-  for (const c of d.checkins) if (!lastBy.has(c.client_id)) lastBy.set(c.client_id, c.submitted_at);
+  const first = (profile?.full_name || '').split(' ')[0] || 'Coach';
+  const today = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/London' });
+  const ai = aiEnabled();
+  const brief = coach.ai_brief && Date.now() - new Date(coach.ai_brief.generated_at).getTime() < 7 * 86_400_000 ? coach.ai_brief : null;
+  const unreadTotal = [...d.unreadBy.values()].reduce((a, b) => a + b, 0);
+  const noProgramme = d.active.filter((c) => !d.withProgramme.has(c.id));
+  const renewalsThisWeek = d.renewals.filter((c) => (new Date(c.renewal_date!).getTime() - Date.now()) / 86_400_000 <= 7);
+  const staleInvites = d.invited.filter((c) => Date.now() - new Date(c.created_at).getTime() > 3 * 86_400_000);
 
-  const attention = d.active.filter((c) => c.risk_level !== 'low' || c.payment_status === 'overdue').slice(0, 5);
-  const top = d.active.find((c) => c.risk_level === 'high') ?? attention[0];
-  const renewals = d.active.filter((c) => { const n = daysUntil(c.renewal_date); return n != null && n >= 0 && n <= 30; })
-    .sort((a, b) => (a.renewal_date! < b.renewal_date! ? -1 : 1)).slice(0, 5);
-  const growth = d.stats.mrrDelta;
-  const weekLabels = ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
-  const pendingCount = d.checkins.filter((c) => c.status === 'submitted').length;
+  const tasks: Task[] = [
+    d.pendingReview.length && { icon: 'checkins', tone: 'bg-brand-50 text-brand-300', title: `Review ${d.pendingReview.length} check-in${d.pendingReview.length === 1 ? '' : 's'}`, detail: 'Oldest first. AI summaries are ready where available.', href: d.pendingReview.length ? `/coach/checkins/${d.pendingReview[d.pendingReview.length - 1].id}` : '/coach/checkins', cta: 'Start' },
+    d.missed.length && { icon: 'missed', tone: 'bg-red-50 text-red-400', title: `Nudge ${d.missed.length} client${d.missed.length === 1 ? '' : 's'} who missed check-in`, detail: d.missed.slice(0, 3).map((c) => c.full_name.split(' ')[0]).join(', ') + (d.missed.length > 3 ? ` +${d.missed.length - 3}` : ''), href: '/coach/checkins?view=missed', cta: 'View' },
+    unreadTotal && { icon: 'messages', tone: 'bg-sky-50 text-sky-400', title: `Reply to ${unreadTotal} message${unreadTotal === 1 ? '' : 's'}`, detail: `From ${d.unreadBy.size} client${d.unreadBy.size === 1 ? '' : 's'}`, href: '/coach/messages', cta: 'Open' },
+    d.overdue.length && { icon: 'pound', tone: 'bg-amber-50 text-amber-400', title: `${d.overdue.length} overdue payment${d.overdue.length === 1 ? '' : 's'}`, detail: d.overdue.map((c) => c.full_name.split(' ')[0]).join(', '), href: '/coach/clients?filter=overdue', cta: 'View' },
+    renewalsThisWeek.length && { icon: 'calendar', tone: 'bg-emerald-50 text-emerald-400', title: `${renewalsThisWeek.length} renewal${renewalsThisWeek.length === 1 ? '' : 's'} this week`, detail: gbp(renewalsThisWeek.reduce((s, c) => s + Number(c.monthly_fee || 0), 0)) + ' due', href: '/coach/clients?filter=renewing', cta: 'View' },
+    noProgramme.length && { icon: 'programs', tone: 'bg-amber-50 text-amber-400', title: `${noProgramme.length} client${noProgramme.length === 1 ? ' has' : 's have'} no programme`, detail: noProgramme.slice(0, 3).map((c) => c.full_name.split(' ')[0]).join(', '), href: `/coach/clients/${noProgramme[0]?.id}?tab=training`, cta: 'Assign' },
+    staleInvites.length && { icon: 'mail', tone: 'bg-sky-50 text-sky-400', title: `${staleInvites.length} invite${staleInvites.length === 1 ? '' : 's'} not accepted`, detail: 'Resend the link by DM or email', href: '/coach/clients?filter=invited', cta: 'View' },
+  ].filter(Boolean) as Task[];
+
+  const fallbackPriorities = d.attention.slice(0, 3);
 
   return (
-    <div className="mx-auto max-w-[1400px] space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+    <div className="mx-auto max-w-[1320px] space-y-5 md:space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-3xl md:text-4xl">{greeting()}, {first} <span aria-hidden>👋</span></h1>
-          <p className="mt-1.5 text-slate-600">Here&apos;s what&apos;s happening with your coaching business today.</p>
+          <p className="text-[13px] text-slate-500">{today}</p>
+          <h1 className="mt-0.5 text-2xl md:text-[28px]">{greeting()}, {first}</h1>
         </div>
-        <form action={refreshAllRisk}><SubmitButton className="btn-secondary" pendingText="Refreshing…">Refresh insights</SubmitButton></form>
+        <form action={refreshAllRisk}><SubmitButton className="btn-secondary btn-sm" pendingText="Refreshing…"><Icon name="refresh" className="h-4 w-4" />Refresh</SubmitButton></form>
       </div>
+      {sp.error && <Alert tone="red">{sp.error}</Alert>}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Active Clients" value={d.stats.active} tone="bg-brand-50 text-brand-400" icon={<Icon name="clients" className="h-7 w-7" />}>
-          <Delta value={d.stats.activeDelta} suffix={d.stats.activeDelta == null ? `of ${coach.client_limit} places` : ''} />
-        </StatCard>
-        <StatCard label="Client Retention" value={d.stats.retention == null ? '—' : `${d.stats.retention}%`} tone="bg-emerald-50"
-          icon={<Donut value={d.stats.retention ?? 0} size={40} />}>
-          <span className="text-xs text-slate-500">of clients still with you</span>
-        </StatCard>
-        <StatCard label="Check-ins This Week" value={<>{d.stats.checkedThisWeek} <span className="text-slate-500">/</span> {d.stats.active}</>} tone="bg-sky-50 text-sky-400" icon={<Icon name="calendar" className="h-7 w-7" />}>
-          <Delta value={d.stats.checkinDelta} suffix={d.stats.checkinDelta == null ? `${pendingCount} to review` : ''} />
-        </StatCard>
-        <StatCard label="Monthly Revenue" value={gbp(d.stats.mrr)} tone="bg-[rgba(236,72,153,0.14)] text-pink-400" icon={<Icon name="pound" className="h-7 w-7" strokeWidth={2.2} />}>
-          <Delta value={d.stats.mrrDelta} suffix={d.stats.mrrDelta == null ? 'from client fees' : ' vs 3 mo'} />
-        </StatCard>
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-3">
-        <section className="card xl:col-span-2">
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
-            <h2>Client Engagement</h2>
-            <div className="flex items-center gap-5 text-sm text-slate-600">
-              <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-brand-500" />Last 4 weeks</span>
-              <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-slate-400" />Previous 4 weeks</span>
-            </div>
+      {d.clients.length === 0 ? (
+        <Card>
+          <EmptyState icon="clients" title="Add your first client" action={<Link href="/coach/clients/new" className="btn-primary"><Icon name="plus" className="h-4 w-4" />Add client</Link>}>
+            Add a client and send them their invite link. Their check-ins, workouts and messages will start appearing here.
+          </EmptyState>
+        </Card>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
+            <Metric label="Active clients" icon="clients" value={d.stats.active} href="/coach/clients"
+              sub={<>{d.invited.length > 0 ? `${d.invited.length} invited · ` : ''}{coach.client_limit - d.clients.length} places free</>} />
+            <Metric label="Monthly revenue" icon="pound" tone="pink" value={gbp(d.mrr)} href="/coach/analytics"
+              sub={d.revenueAtRisk > 0 ? <span className="text-red-700">{gbp(d.revenueAtRisk)} at risk</span> : `${d.paying.length} paying client${d.paying.length === 1 ? '' : 's'}`} />
+            <Metric label="Check-ins this week" icon="checkins" tone="blue" href="/coach/checkins"
+              value={<>{d.submitted.length}<span className="text-lg text-slate-500">/{d.eligible.length}</span></>}
+              sub={`Due ${relativeDay(d.cycle.due)}${d.stats.completion != null ? ` · ${d.stats.completion}% in` : ''}`} />
+            <Metric label="Need attention" icon="alert" tone={d.atRisk.length ? 'red' : 'green'} value={d.attention.length} href="/coach/clients?filter=attention"
+              sub={d.attention.length ? `${d.atRisk.length} at risk · ${d.missed.length} missed check-in` : 'Everyone is on track'} />
           </div>
-          <LineChart labels={weekLabels} current={d.engagement.current} previous={d.engagement.previous} />
-          <p className="text-xs text-slate-500">Average of training and nutrition adherence from client check-ins.</p>
-        </section>
 
-        <section className="relative overflow-hidden rounded-2xl border border-brand-200 bg-gradient-to-br from-[#1d1650] via-[#151a3c] to-surface p-6 shadow-glow">
-          <div className="flex items-center justify-between">
-            <h2 className="flex items-center gap-2"><Icon name="sparkle" className="h-6 w-6 text-brand-300" /> AI Insights</h2>
-            {top && <Link href={`/coach/clients/${top.id}`} className="flex items-center gap-1 text-sm link">View details <Icon name="arrowRight" className="h-4 w-4" /></Link>}
-          </div>
-          {top ? (
-            <>
-              <span className={`mt-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium ${top.risk_level === 'high' ? 'bg-amber-600 text-white' : 'bg-amber-100 text-amber-700'}`}>
-                <Icon name="alert" className="h-4 w-4" /> {top.risk_level === 'high' ? 'Attention Needed' : 'Worth a look'}
-              </span>
-              <p className="mt-3 text-[17px] leading-snug text-slate-900">
-                <strong>{top.full_name}</strong>{"'s engagement is slipping"}
-                {top.risk_reasons.length ? `: ${top.risk_reasons.slice(0, 2).map((r) => r.charAt(0).toLowerCase() + r.slice(1)).join(' and ')}.` : '.'}
-              </p>
-              <div className="mt-5 text-sm font-semibold text-slate-900">Recommended action:</div>
-              <div className="mt-2 flex items-start gap-3 rounded-xl border border-slate-200 bg-[#0e1328]/70 p-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-300"><Icon name="messages" className="h-5 w-5" /></span>
-                <p className="text-sm text-slate-700">{recommendedAction(top)}</p>
+          <div className="grid gap-5 md:gap-6 xl:grid-cols-5">
+            <Card title="Today" description={tasks.length ? `${tasks.length} thing${tasks.length === 1 ? '' : 's'} to do` : undefined} className="xl:col-span-3" flush>
+              {tasks.length === 0 ? (
+                <div className="px-4 pb-4 md:px-5"><EmptyState compact icon="checkCircle" title="You're all caught up">Nothing needs doing right now. New check-ins and messages will show up here.</EmptyState></div>
+              ) : (
+                <ul className="divide-y divide-slate-200 border-t border-slate-200">
+                  {tasks.map((t) => (
+                    <li key={t.title}>
+                      <Link href={t.href} className="row-link flex items-center gap-3 px-4 py-3 md:px-5">
+                        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${t.tone}`}><Icon name={t.icon} className="h-[18px] w-[18px]" /></span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-medium text-slate-900">{t.title}</span>
+                          <span className="block truncate text-[13px] text-slate-500">{t.detail}</span>
+                        </span>
+                        <span className="hidden text-[13px] font-medium text-brand-700 sm:inline">{t.cta}</span>
+                        <Icon name="chevronRight" className="h-4 w-4 shrink-0 text-slate-400" />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+
+            <section className="relative overflow-hidden rounded-2xl border border-brand-200 bg-gradient-to-br from-[#1a1442] via-[#131530] to-surface p-4 shadow-glow md:p-5 xl:col-span-2">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="flex items-center gap-2"><Icon name="sparkle" className="h-5 w-5 text-brand-300" />Weekly priorities</h2>
+                {ai ? (
+                  <form action={generateBrief}><SubmitButton className="btn-ghost btn-sm text-brand-100" pendingText="Thinking…">{brief ? 'Regenerate' : 'Generate'}</SubmitButton></form>
+                ) : <Badge tone="slate">AI off</Badge>}
               </div>
-              <Link href={`/coach/clients/${top.id}?tab=messages&draft=1`} className="btn-primary mt-4 w-full py-2.5">Draft message <Icon name="sparkle" className="h-4 w-4" /></Link>
-            </>
-          ) : (
-            <p className="mt-4 text-slate-600">No one needs urgent attention. Insights appear here when a client&apos;s check-ins, workouts or payments start slipping.</p>
-          )}
-        </section>
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-3">
-        <section className="card">
-          <div className="mb-3 flex items-center justify-between"><h2>Clients Needing Attention</h2>
-            <Link href="/coach/clients" className="flex items-center gap-1 text-sm link">View all <Icon name="arrowRight" className="h-4 w-4" /></Link></div>
-          {attention.length === 0 ? <p className="py-6 text-center text-sm text-slate-500">Everyone is on track.</p> : (
-            <ul className="space-y-1">
-              {attention.map((c) => {
-                const m = attentionMeta(c, lastBy.get(c.id));
-                return (
-                  <li key={c.id} className="flex items-center gap-3 rounded-xl px-1 py-2">
-                    <Avatar name={c.full_name} size={38} />
-                    <Link href={`/coach/clients/${c.id}`} className="min-w-0 flex-1">
-                      <div className="truncate font-medium hover:underline">{c.full_name}</div>
-                      <div className="truncate text-sm text-slate-500">{m.sub}</div>
-                    </Link>
-                    {m.pill}
-                    <Link href={m.href} className="btn-secondary px-3 py-1.5 text-xs">{m.action}</Link>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </section>
-
-        <section className="card">
-          <div className="mb-3 flex items-center justify-between"><h2>Upcoming Renewals</h2>
-            <Link href="/coach/clients" className="flex items-center gap-1 text-sm link">View all <Icon name="arrowRight" className="h-4 w-4" /></Link></div>
-          {renewals.length === 0 ? <p className="py-6 text-center text-sm text-slate-500">No renewals in the next 30 days.</p> : (
-            <ul className="space-y-1">
-              {renewals.map((c) => {
-                const n = daysUntil(c.renewal_date)!;
-                return (
-                  <li key={c.id} className="flex items-center gap-3 py-2">
-                    <Avatar name={c.full_name} size={38} />
-                    <Link href={`/coach/clients/${c.id}`} className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 truncate font-medium hover:underline">{c.full_name}
-                        {c.risk_level === 'high' && <span className="h-2 w-2 rounded-full bg-red-500" title="At risk" />}</div>
-                      <div className="text-sm text-slate-500">Renews {n === 0 ? 'today' : `in ${n} day${n === 1 ? '' : 's'}`}</div>
-                    </Link>
-                    <span className="text-sm font-medium text-slate-800">{c.monthly_fee ? `${gbp(c.monthly_fee)}/month` : '—'}</span>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </section>
-
-        <section className="card flex flex-col">
-          <h2>Your Business Growth</h2>
-          <div className="mt-4 flex flex-1 flex-col justify-between gap-5">
-            <div>
-              {growth != null ? (
-                <div className={`flex items-center gap-2 text-4xl font-bold ${growth >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                  <Icon name={growth >= 0 ? 'trend' : 'arrowDown'} className="h-8 w-8" strokeWidth={2.4} />{growth >= 0 ? '+' : ''}{growth}%
-                </div>
-              ) : <div className="text-4xl font-bold">{gbp(d.mrr)}</div>}
-              <div className="mt-1 text-sm text-slate-600">{growth != null ? 'monthly revenue vs 3 months ago' : 'monthly revenue'}</div>
-            </div>
-            <BarChart values={d.revenue.map((r) => r.value)} labels={d.revenue.map((r) => r.label)} height={110} showLabels />
+              {brief ? (
+                <>
+                  <p className="mt-2 text-[13px] text-slate-700">{brief.headline}</p>
+                  <ol className="mt-3 space-y-2.5">
+                    {brief.priorities.slice(0, 4).map((p, i) => (
+                      <li key={p.client_id + i} className="rounded-xl border border-slate-200 bg-[#0c0e18]/70 p-3">
+                        <Link href={`/coach/clients/${p.client_id}`} className="flex items-center gap-2 font-medium hover:underline"><Avatar name={p.name} size={22} />{p.name}</Link>
+                        <p className="mt-1.5 text-[13px] text-slate-700"><span className="eyebrow mr-1.5">Data</span>{p.observation}</p>
+                        <p className="mt-1 text-[13px] text-slate-700"><span className="eyebrow mr-1.5 text-brand-300">Idea</span>{p.suggestion}</p>
+                      </li>
+                    ))}
+                  </ol>
+                  <p className="mt-3 text-2xs text-slate-500">AI summary of your client data, {timeAgo(brief.generated_at)}. Suggestions only. You decide.</p>
+                </>
+              ) : fallbackPriorities.length ? (
+                <>
+                  <p className="mt-2 text-[13px] text-slate-600">Ranked from check-ins, workouts, payments and renewals.</p>
+                  <ol className="mt-3 space-y-2.5">
+                    {fallbackPriorities.map(({ c, s }) => (
+                      <li key={c.id} className="rounded-xl border border-slate-200 bg-[#0c0e18]/70 p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <Link href={`/coach/clients/${c.id}`} className="flex min-w-0 items-center gap-2 font-medium hover:underline"><Avatar name={c.full_name} size={22} /><span className="truncate">{c.full_name}</span></Link>
+                          <RiskBadge level={c.risk_level} />
+                        </div>
+                        <p className="mt-1.5 text-[13px] text-slate-700"><span className="eyebrow mr-1.5">Data</span>{s?.state === 'missed' ? (s.missedCount > 1 ? `Missed ${s.missedCount} check-ins. ` : 'Missed this week’s check-in. ') : ''}{c.risk_reasons.slice(0, 2).join('. ') || (c.payment_status === 'overdue' ? 'Payment overdue.' : '')}</p>
+                        <p className="mt-1 text-[13px] text-slate-700"><span className="eyebrow mr-1.5 text-brand-300">Idea</span>{recommendedAction(c, s)}</p>
+                      </li>
+                    ))}
+                  </ol>
+                  {!ai && <p className="mt-3 text-2xs text-slate-500">Connect AI in Settings for a written weekly brief.</p>}
+                </>
+              ) : (
+                <p className="mt-3 text-[13px] text-slate-600">No one needs urgent attention. Priorities appear here when check-ins, workouts or payments start slipping.</p>
+              )}
+            </section>
           </div>
-        </section>
-      </div>
 
-      <div className="grid gap-6 xl:grid-cols-5">
-        <section className="card xl:col-span-3">
-          <div className="mb-3 flex items-center justify-between"><h2>Recent Activity</h2>
-            <Link href="/coach/checkins" className="flex items-center gap-1 text-sm link">View all <Icon name="arrowRight" className="h-4 w-4" /></Link></div>
-          {d.activity.length === 0 ? <p className="py-6 text-center text-sm text-slate-500">Activity from your clients will appear here.</p> : (
-            <ul className="divide-y divide-slate-200">
-              {d.activity.map((a, i) => (
-                <li key={i}>
-                  <Link href={a.href} className="flex items-center gap-3 py-2.5 hover:text-slate-900">
-                    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${a.kind === 'checkin' ? 'bg-emerald-50 text-emerald-400' : a.kind === 'workout' ? 'bg-brand-50 text-brand-300' : 'bg-[rgba(236,72,153,0.14)] text-pink-400'}`}>
-                      <Icon name={a.kind === 'checkin' ? 'check' : a.kind === 'workout' ? 'dumbbell' : 'mail'} className="h-4 w-4" strokeWidth={2.2} />
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-[15px] text-slate-800">{a.text}</span>
-                    <span className="shrink-0 text-sm text-slate-500">{timeAgo(a.at)}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+          <div className="grid gap-5 md:gap-6 lg:grid-cols-2">
+            <Card title="Clients needing attention" action={<CardLink href="/coach/clients?filter=attention">View all</CardLink>} flush>
+              {d.attention.length === 0 ? <div className="px-4 pb-4 md:px-5"><EmptyState compact icon="checkCircle" title="Everyone is on track" /></div> : (
+                <ul className="divide-y divide-slate-200 border-t border-slate-200">
+                  {d.attention.slice(0, 5).map(({ c, s }) => {
+                    const reason = c.payment_status === 'overdue' ? 'Payment overdue' : s?.state === 'missed' ? (s.missedCount > 1 ? `Missed ${s.missedCount} check-ins` : 'Missed this week’s check-in') : c.risk_reasons[0] ?? 'Engagement dipping';
+                    return (
+                      <li key={c.id} className="flex items-center gap-3 px-4 py-3 md:px-5">
+                        <Avatar name={c.full_name} size={36} />
+                        <Link href={`/coach/clients/${c.id}`} className="min-w-0 flex-1">
+                          <span className="block truncate font-medium hover:underline">{c.full_name}</span>
+                          <span className="block truncate text-[13px] text-slate-500">{reason}</span>
+                        </Link>
+                        <RiskBadge level={c.risk_level} />
+                        <Link href={`/coach/clients/${c.id}?tab=messages&draft=1`} className="btn-secondary btn-sm hidden sm:inline-flex">Message</Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </Card>
 
-        <section className="relative overflow-hidden rounded-2xl border border-brand-200 bg-gradient-to-br from-[#1b1450] via-[#161a3d] to-[#2a1a73] p-7 xl:col-span-2">
-          <svg className="pointer-events-none absolute -right-6 -top-6 h-[140%] w-2/3 opacity-60" viewBox="0 0 200 200" aria-hidden>
-            <defs><linearGradient id="pr" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#7c5cff" stopOpacity="0" /><stop offset="1" stopColor="#9a83ff" stopOpacity="0.9" /></linearGradient></defs>
-            {[0, 1, 2, 3].map((i) => <path key={i} d={`M${20 + i * 30} 200 L${200} ${20 + i * 25}`} stroke="url(#pr)" strokeWidth={i === 1 ? 3 : 1} />)}
-            <circle cx="150" cy="70" r="46" fill="#7c5cff" opacity="0.18" /><circle cx="170" cy="120" r="24" fill="#9a83ff" opacity="0.25" />
-          </svg>
-          <div className="relative max-w-sm">
-            {coach.plan === 'pro' ? (
-              <>
-                <h2 className="text-xl">Grow your coaching business</h2>
-                <p className="mt-2 text-sm text-slate-700">You have {coach.client_limit - d.clients.length} client places free. Invite your next client and they&apos;ll have their app in minutes.</p>
-                <Link href="/coach/clients" className="btn-primary mt-5">Invite a client <Icon name="arrowRight" className="h-4 w-4" /></Link>
-              </>
-            ) : (
-              <>
-                <h2 className="text-xl">Grow your coaching business</h2>
-                <p className="mt-2 text-sm text-slate-700">Coach up to 75 clients with every feature included: AI check-ins, retention insights and your client app.</p>
-                <Link href="/coach/billing" className="btn-primary mt-5">{coach.plan === 'trial' ? 'See plans' : 'Explore Pro'} <Icon name="arrowRight" className="h-4 w-4" /></Link>
-              </>
-            )}
+            <Card title="Upcoming renewals" description="Next 14 days" action={<CardLink href="/coach/clients?filter=renewing">View all</CardLink>} flush>
+              {d.renewals.length === 0 ? <div className="px-4 pb-4 md:px-5"><EmptyState compact icon="calendar" title="No renewals in the next 14 days" /></div> : (
+                <ul className="divide-y divide-slate-200 border-t border-slate-200">
+                  {d.renewals.slice(0, 5).map((c) => {
+                    const n = Math.ceil((new Date(c.renewal_date!).getTime() - Date.now()) / 86_400_000);
+                    return (
+                      <li key={c.id}>
+                        <Link href={`/coach/clients/${c.id}`} className="row-link flex items-center gap-3 px-4 py-3 md:px-5">
+                          <Avatar name={c.full_name} size={36} />
+                          <span className="min-w-0 flex-1">
+                            <span className="flex items-center gap-2 truncate font-medium">{c.full_name}{c.risk_level === 'high' && <span className="h-1.5 w-1.5 rounded-full bg-red-500" title="At risk" />}</span>
+                            <span className="block text-[13px] text-slate-500">{n <= 0 ? 'Renews today' : `Renews in ${n} day${n === 1 ? '' : 's'}`}{c.payment_status !== 'paid' ? ` · ${c.payment_status}` : ''}</span>
+                          </span>
+                          <span className="num text-sm font-medium text-slate-800">{c.monthly_fee ? gbp(c.monthly_fee) : '—'}</span>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </Card>
           </div>
-        </section>
-      </div>
+
+          <div className="grid gap-5 md:gap-6 xl:grid-cols-5">
+            <Card title="Client engagement" description="Average training and nutrition adherence from check-ins" className="xl:col-span-3"
+              action={<div className="hidden items-center gap-4 text-xs text-slate-500 sm:flex"><span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-brand-500" />Last 4 weeks</span><span className="flex items-center gap-1.5"><span className="h-0.5 w-3 bg-slate-400" />Previous</span></div>}>
+              <LineChart labels={['4 wks ago', '3 wks ago', '2 wks ago', 'This week']} current={d.engagement.current} previous={d.engagement.previous} />
+            </Card>
+
+            <Card title="Recent activity" className="xl:col-span-2" flush>
+              {d.activity.length === 0 ? <div className="px-4 pb-4 md:px-5"><EmptyState compact icon="inbox" title="No activity yet">Check-ins, workouts and messages from clients appear here.</EmptyState></div> : (
+                <ul className="divide-y divide-slate-200 border-t border-slate-200">
+                  {d.activity.map((a, i) => (
+                    <li key={i}>
+                      <Link href={a.href} className="row-link flex items-center gap-3 px-4 py-2.5 md:px-5">
+                        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${a.kind === 'checkin' ? 'bg-emerald-50 text-emerald-400' : a.kind === 'workout' ? 'bg-brand-50 text-brand-300' : 'bg-sky-50 text-sky-400'}`}>
+                          <Icon name={a.kind === 'checkin' ? 'check' : a.kind === 'workout' ? 'dumbbell' : 'messages'} className="h-3.5 w-3.5" strokeWidth={2.2} />
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-[13px] text-slate-800">{a.text}</span>
+                        <span className="shrink-0 text-xs text-slate-500">{timeAgo(a.at)}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          </div>
+          <p className="text-center text-xs text-slate-500">Check-ins are due every {DAYS[coach.checkin_day]}. Change this in <Link href="/coach/settings" className="link">Settings</Link>.</p>
+        </>
+      )}
     </div>
   );
 }

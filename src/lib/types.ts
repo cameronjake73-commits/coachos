@@ -21,8 +21,34 @@ export interface Client {
   risk_reasons: string[];
   risk_updated_at: string | null;
   email_reminders: boolean;
+  phone: string | null;
+  target_weight_kg: number | null;
+  goal_deadline: string | null;
+  archived_at: string | null;
+  ai_summary: AiClientSummary | null;
+  ai_draft: string | null;
+  ai_draft_at: string | null;
   created_at: string;
 }
+
+export interface AiClientSummary {
+  summary: string;
+  observations: string[];
+  suggestions: string[];
+  model: string;
+  generated_at: string;
+}
+
+export type QuestionType = 'text' | 'scale' | 'yesno';
+export interface CheckinQuestion { id: string; label: string; type?: QuestionType }
+export const MEASUREMENTS = [
+  { key: 'waist_cm', id: 'waist', label: 'Waist', unit: 'cm' },
+  { key: 'chest_cm', id: 'chest', label: 'Chest', unit: 'cm' },
+  { key: 'hips_cm', id: 'hips', label: 'Hips', unit: 'cm' },
+  { key: 'arm_cm', id: 'arm', label: 'Arm', unit: 'cm' },
+  { key: 'thigh_cm', id: 'thigh', label: 'Thigh', unit: 'cm' },
+  { key: 'body_fat_pct', id: 'body_fat', label: 'Body fat', unit: '%' },
+] as const;
 
 export interface Checkin {
   id: string;
@@ -31,6 +57,11 @@ export interface Checkin {
   submitted_at: string;
   weight_kg: number | null;
   waist_cm: number | null;
+  chest_cm: number | null;
+  hips_cm: number | null;
+  arm_cm: number | null;
+  thigh_cm: number | null;
+  body_fat_pct: number | null;
   sleep_hours: number | null;
   sleep_quality: number | null;
   energy: number | null;
@@ -51,6 +82,10 @@ export interface Checkin {
 
 export interface AiAnalysis {
   summary: string;
+  /** Facts taken directly from the data (older analyses called these "changes"). */
+  observations?: string[];
+  /** Ideas for the coach to consider. The coach decides. */
+  suggestions?: string[];
   changes: string[];
   concerns: string[];
   investigate: string[];
@@ -71,8 +106,10 @@ export interface Coach {
   trial_ends_at: string;
   ai_voice_notes: string | null;
   checkin_day: number;
-  checkin_questions: { id: string; label: string }[];
+  checkin_questions: CheckinQuestion[];
+  checkin_measurements: string[];
   email_digest: boolean;
+  ai_brief: AiBrief | null;
 }
 
 export interface Exercise {
@@ -105,4 +142,11 @@ export interface Workout {
   position: number;
   notes: string | null;
   workout_exercises?: WorkoutExercise[];
+}
+
+export interface AiBrief {
+  headline: string;
+  priorities: { client_id: string; name: string; observation: string; suggestion: string }[];
+  model: string;
+  generated_at: string;
 }

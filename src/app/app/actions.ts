@@ -23,32 +23,45 @@ export async function completeOnboarding(formData: FormData) {
   redirect('/app');
 }
 
+/** Reads a number within a sensible range; anything outside it is ignored rather than stored. */
+const rn = (f: FormData, k: string, min: number, max: number) => { const v = n(f, k); return v == null || !Number.isFinite(v) || v < min || v > max ? null : v; };
+
 export async function submitCheckin(formData: FormData) {
   const { supabase, client } = await requireClient();
+  const { data: coach } = await supabase.from('coaches').select('checkin_questions').eq('id', client.coach_id).single();
+  const known = new Set(((coach?.checkin_questions ?? []) as { id: string }[]).map((q) => q.id));
   const custom: Record<string, string> = {};
-  for (const [k, v] of formData.entries()) if (k.startsWith('custom_') && String(v).trim()) custom[k.slice(7)] = String(v).trim().slice(0, 2000);
+  for (const [k, v] of formData.entries()) {
+    if (!k.startsWith('custom_') || !known.has(k.slice(7))) continue;
+    const val = String(v).trim();
+    if (val) custom[k.slice(7)] = val.slice(0, 2000);
+  }
 
   const { data: ci, error } = await supabase.from('checkins').insert({
     client_id: client.id, coach_id: client.coach_id,
-    weight_kg: n(formData, 'weight_kg'), waist_cm: n(formData, 'waist_cm'),
-    sleep_hours: n(formData, 'sleep_hours'), sleep_quality: n(formData, 'sleep_quality'),
-    energy: n(formData, 'energy'), stress: n(formData, 'stress'), hunger: n(formData, 'hunger'),
-    training_adherence: n(formData, 'training_adherence'), nutrition_adherence: n(formData, 'nutrition_adherence'),
-    avg_steps: n(formData, 'avg_steps'),
+    weight_kg: rn(formData, 'weight_kg', 20, 400), waist_cm: rn(formData, 'waist_cm', 10, 300),
+    chest_cm: rn(formData, 'chest_cm', 10, 300), hips_cm: rn(formData, 'hips_cm', 10, 300),
+    arm_cm: rn(formData, 'arm_cm', 5, 150), thigh_cm: rn(formData, 'thigh_cm', 10, 200), body_fat_pct: rn(formData, 'body_fat_pct', 2, 70),
+    sleep_hours: rn(formData, 'sleep_hours', 0, 24), sleep_quality: rn(formData, 'sleep_quality', 1, 10),
+    energy: rn(formData, 'energy', 1, 10), stress: rn(formData, 'stress', 1, 10), hunger: rn(formData, 'hunger', 1, 10),
+    training_adherence: rn(formData, 'training_adherence', 0, 100), nutrition_adherence: rn(formData, 'nutrition_adherence', 0, 100),
+    avg_steps: rn(formData, 'avg_steps', 0, 100000),
     wins: t(formData, 'wins'), struggles: t(formData, 'struggles'), questions: t(formData, 'questions'),
     custom_answers: custom,
   }).select('id').single();
-  if (error || !ci) redirect(`/app/checkin?error=${encodeURIComponent(error?.message ?? 'Could not submit')}`);
+  if (error || !ci) redirect(`/app/checkin?error=${encodeURIComponent(error?.message ?? 'Could not submit. Please try again.')}`);
 
-  // Optional progress photos (max 3, 8MB each, images only)
-  const files = formData.getAll('photos').filter((f): f is File => f instanceof File && f.size > 0).slice(0, 3);
-  const poses = ['front', 'side', 'back'];
-  for (const [i, file] of files.entries()) {
+  // Optional progress photos, one per pose (images only, 8MB max each). Also accepts the older multi-file "photos" field.
+  const slots: [string, File][] = (['front', 'side', 'back'] as const)
+    .map((pose) => [pose, formData.get(`photo_${pose}`)] as [string, FormDataEntryValue | null])
+    .filter((x): x is [string, File] => x[1] instanceof File && x[1].size > 0);
+  if (!slots.length) formData.getAll('photos').filter((f): f is File => f instanceof File && f.size > 0).slice(0, 3).forEach((f, i) => slots.push([['front', 'side', 'back'][i], f]));
+  for (const [pose, file] of slots) {
     if (!file.type.startsWith('image/') || file.size > 8 * 1024 * 1024) continue;
     const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 5) || 'jpg';
-    const path = `${client.id}/${ci.id}-${poses[i] ?? i}.${ext}`;
+    const path = `${client.id}/${ci.id}-${pose}.${ext}`;
     const { error: upErr } = await supabase.storage.from('progress-photos').upload(path, file, { contentType: file.type, upsert: true });
-    if (!upErr) await supabase.from('progress_photos').insert({ client_id: client.id, checkin_id: ci.id, storage_path: path, pose: poses[i] ?? 'other' });
+    if (!upErr) await supabase.from('progress_photos').insert({ client_id: client.id, checkin_id: ci.id, storage_path: path, pose });
   }
 
   after(() => afterCheckinSubmitted(ci.id, client.id, client.coach_id));

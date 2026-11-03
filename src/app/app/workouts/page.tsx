@@ -14,14 +14,14 @@ export default async function ClientWorkouts({ searchParams }: { searchParams: P
   return (
     <div className="space-y-4">
       <h1>Training</h1>
-      {sp.logged && <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">Workout saved. Great work.</p>}
+      {sp.logged && <p className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">Workout saved. Great work.</p>}
       {prog ? (
         <section className="card">
           <div className="font-semibold">{prog.name}</div>
           {prog.description && <p className="mt-1 text-sm text-slate-600">{prog.description}</p>}
           <ul className="mt-3 space-y-2">{workouts.map((w) => (
-            <li key={w.id}><Link href={`/app/workouts/${w.id}`} className="flex items-center justify-between rounded-lg border border-slate-200 p-3 active:bg-slate-50">
-              <span className="font-medium">{w.name}</span><span className="text-sm text-slate-500">{w.workout_exercises?.length ?? 0} exercises →</span></Link></li>
+            <li key={w.id}><Link href={`/app/workouts/${w.id}`} className="flex min-h-[56px] items-center justify-between gap-3 rounded-xl border border-slate-200 px-3.5 py-3 transition active:bg-raised">
+              <span className="min-w-0"><span className="block truncate font-medium">{w.name}</span><span className="text-[13px] text-slate-500">{w.workout_exercises?.length ?? 0} exercises</span></span><span className="text-brand-700">Start ›</span></Link></li>
           ))}</ul>
         </section>
       ) : <p className="card text-sm text-slate-500">No programme assigned yet.</p>}

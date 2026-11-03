@@ -126,7 +126,8 @@ async function main() {
     plan: 'pro', client_limit: 75, subscription_status: 'active', trial_ends_at: new Date(Date.now() + 3650 * DAY).toISOString(),
     checkin_day: 0, email_digest: false,
     ai_voice_notes: "Warm, direct and upbeat. Short paragraphs. Use their first name. Celebrate one specific win, be honest about adherence, give 1-2 clear actions. Sign off '- Sam'.",
-    checkin_questions: [{ id: 'q1', label: 'How was your digestion this week?' }, { id: 'q2', label: 'Anything coming up next week (holidays, events, busy work)?' }],
+    checkin_questions: [{ id: 'q1', label: 'How was your digestion this week?', type: 'text' }, { id: 'q2', label: 'Anything coming up next week (holidays, events, busy work)?', type: 'text' }],
+    checkin_measurements: ['waist', 'hips'],
   }).eq('id', coachId).select('id'), 'update coach');
 
   // Exercise lookup
@@ -163,6 +164,8 @@ async function main() {
     const client = await must(admin.from('clients').insert({
       coach_id: coachId, full_name: p.name, email: `${p.name.toLowerCase().replace(/[^a-z]+/g, '.')}@example.com`,
       status: 'active', goal: p.goal, monthly_fee: p.fee, renewal_date: dateOnly(p.renewalIn),
+      target_weight_kg: /lose|drop|cut|lean/i.test(p.goal) ? Math.round(p.startWeight - 6) : null,
+      phone: '07700 900' + String(100 + clientIds.length * 7).slice(-3),
       payment_status: p.pattern === 'overdue' ? 'overdue' : p.renewalIn <= 7 && p.renewalIn >= 0 ? 'due' : 'paid',
       start_date: new Date(Date.now() - Math.max(p.months * 30, weeks * 7 + 3) * DAY).toISOString().slice(0, 10),
       health_consent_at: iso(weeks * 7 * DAY),
@@ -223,6 +226,7 @@ async function main() {
       const checkin = {
         client_id: client.id, coach_id: coachId, submitted_at: sunday.toISOString(),
         weight_kg: weight, waist_cm: r1(p.startWeight * 1.0 + (weight - p.startWeight) * 0.9 + jitter(0, 0.4)),
+        hips_cm: r1(p.startWeight * 1.25 + (weight - p.startWeight) * 0.7 + jitter(0, 0.4)),
         sleep_hours: r1(jitter(m.sleepH, 0.3)), sleep_quality: clamp(jitter(m.sleepQ, 1), 1, 10), energy: clamp(jitter(m.energy, 1), 1, 10),
         stress: clamp(jitter(m.stress, 1), 1, 10), hunger: clamp(jitter(m.hunger, 1.5), 1, 10),
         training_adherence: clamp(m.train / 10, 0, 10) * 10, nutrition_adherence: clamp(m.nutr / 10, 0, 10) * 10,
@@ -278,6 +282,7 @@ function aiFor(p: Persona, latest: { train: number; nutr: number }) {
     summary: `${first}'s adherence has fallen for three weeks running, down to ${latest.train}% training and ${latest.nutr}% nutrition this week. His weight has stalled and started creeping up, stress is high and sleep is down to about 6 hours. He mentions work pressure. This is a classic early drop-off pattern, and his renewal is in 9 days.`,
     changes: ['Training adherence down for 3 consecutive weeks', 'Nutrition adherence down for 3 consecutive weeks', 'Weight trending back up after 6 weeks of steady loss', 'Average steps roughly halved', 'Sleep down about an hour a night, stress at 8/10'],
     concerns: ['Possible early disengagement. Renewal falls in 9 days', 'Reports bloating most days. Worth asking about food choices and stress'],
+    suggestions: ['Consider a lighter "maintenance" fortnight: 3 sessions and a protein target only', 'A short call before the renewal date could help more than a written reply'],
     investigate: ['What has changed at work, and is it temporary?', 'Would a 3-session minimum week feel more doable for the next fortnight?', 'Is the evening eating driven by stress or hunger?'],
     draft_reply: `Hey ${first}, thanks for being honest. I can see work has been brutal and that's had a knock-on effect on sleep, training and food, which is completely normal.\n\nThe 6 weeks before this are proof you can do it, and nothing is lost. For the next two weeks, let's go into "maintenance mode":\n\n1. 3 sessions a week. Upper A, Lower A and one more if you can.\n2. Just hit your protein (190g). Don't worry about perfect calories.\n\nCan we do a quick 10-minute chat this week to plan around your work schedule?\n\n- Sam`,
   };
@@ -286,6 +291,7 @@ function aiFor(p: Persona, latest: { train: number; nutr: number }) {
     summary: `Another excellent week for ${first}: ${latest.train}% training, ${latest.nutr}% nutrition and a further drop in weight and waist. Energy and sleep are good. She's asking to swap Romanian deadlifts due to lower-back tightness.`,
     changes: ['Weight down again, consistent ~0.5kg/week trend', 'Waist down 0.6cm', 'Hip thrust up 5kg on last week', 'Energy steady at 8/10'],
     concerns: ['Lower-back tightness after Romanian deadlifts. Check technique and load before swapping; refer on if it persists or is painful'],
+    suggestions: ['Consider reducing RDL load while you check her form', 'You could swap to back extensions if the tightness continues'],
     investigate: ['Ask for a form video of her RDL', 'Is the tightness muscular fatigue or pain?'],
     draft_reply: `${first}, this is a brilliant week. Another 0.5kg down, your waist keeps coming in, and that hip thrust PB is a big deal. You're right on track for May.\n\nOn the RDLs: tightness can just be your hamstrings and back working hard, but let's be safe. Send me a quick side-on video of your next set and drop the weight by 10kg for now. If it still feels off, we'll swap to a 45-degree back extension.\n\nKeep doing exactly what you're doing!\n\n- Sam`,
   };
