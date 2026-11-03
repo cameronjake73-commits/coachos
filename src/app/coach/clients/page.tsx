@@ -8,6 +8,7 @@ import { checkinStatus, type CheckinStatus } from '@/lib/coaching';
 import { attentionScore } from '@/lib/dashboard-data';
 import { gbp, shortDate, timeAgo } from '@/lib/format';
 import type { Client } from '@/lib/types';
+import { placesText } from '@/lib/plans';
 
 const FILTERS = [
   ['current', 'All'], ['active', 'Active'], ['attention', 'Needs attention'], ['missed', 'Missed check-in'],
@@ -73,7 +74,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
 
   return (
     <div className="mx-auto max-w-6xl space-y-5">
-      <PageHeader title="Clients" description={`${used} of ${coach.client_limit} client places used`}
+      <PageHeader title="Clients" description={placesText(used, coach.client_limit)}
         actions={<><Link href="/coach/clients/import" className="btn-secondary"><Icon name="arrowUp" className="h-4 w-4" />Import</Link><Link href="/coach/clients/new" className="btn-primary"><Icon name="plus" className="h-4 w-4" />Add client</Link></>} />
 
       <div className="space-y-3">

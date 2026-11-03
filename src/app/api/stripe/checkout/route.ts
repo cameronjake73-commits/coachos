@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getStripe } from '@/lib/stripe';
-import { PLANS, type PaidPlan } from '@/lib/plans';
+import { FOUNDING, PLANS, foundingOpen, type PaidPlan } from '@/lib/plans';
 
 export async function POST(request: Request) {
   const form = await request.formData();
   const plan = String(form.get('plan')) as PaidPlan;
   const back = (msg: string) => NextResponse.redirect(new URL(`/coach/billing?error=${encodeURIComponent(msg)}`, request.url), 303);
   if (!(plan in PLANS)) return back('Unknown plan');
-  const priceId = process.env[PLANS[plan].envPrice];
+  const founding = form.get('offer') === 'founding' && foundingOpen();
+  const priceId = process.env[founding ? FOUNDING.envPrice : PLANS[plan].envPrice];
   if (!priceId || !process.env.STRIPE_SECRET_KEY) return back('Payments are not connected yet.');
 
   const supabase = await createClient();

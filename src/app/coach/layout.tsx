@@ -27,8 +27,8 @@ export default async function CoachLayout({ children }: { children: React.ReactN
     <Link href="/coach/billing" className="group flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-100/40 p-3 transition hover:border-slate-300">
       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-400"><Icon name="crown" className="h-4 w-4" /></span>
       <span className="min-w-0 flex-1">
-        <span className="block text-[13px] font-medium text-slate-800">{coach.plan === 'trial' ? `${trialDays} day${trialDays === 1 ? '' : 's'} left in trial` : 'Upgrade your plan'}</span>
-        <span className="block text-xs text-slate-500">{coach.plan === 'trial' ? 'Choose a plan' : 'More client places'}</span>
+        <span className="block text-[13px] font-medium text-slate-800">{coach.plan === 'trial' ? `${trialDays} day${trialDays === 1 ? '' : 's'} left in trial` : 'Move to unlimited'}</span>
+        <span className="block text-xs text-slate-500">{coach.plan === 'trial' ? 'Subscribe to keep going' : 'One plan, every feature'}</span>
       </span>
       <Icon name="chevronRight" className="h-4 w-4 text-slate-400 transition group-hover:text-slate-700" />
     </Link>

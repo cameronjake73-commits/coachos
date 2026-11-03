@@ -3,6 +3,7 @@ import { requireCoach } from '@/lib/auth';
 import { Alert, Card, PageHeader } from '@/components/ui';
 import { ImportWizard } from '@/components/import-wizard';
 import { importClients } from '../actions';
+import { isUnlimited } from '@/lib/plans';
 
 export default async function ImportClientsPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const sp = await searchParams;
@@ -20,7 +21,7 @@ export default async function ImportClientsPage({ searchParams }: { searchParams
       <Card>
         <ImportWizard action={importClients} existingEmails={(data ?? []).map((c) => c.email)} placesLeft={placesLeft} />
       </Card>
-      <p className="text-center text-xs text-slate-500">{placesLeft} of {coach.client_limit} client places free. Only name and email are required. Clients you import start as “Invited” until they accept.</p>
+      <p className="text-center text-xs text-slate-500">{isUnlimited(coach.client_limit) ? 'Unlimited clients on your plan.' : `${placesLeft} of ${coach.client_limit} client places free.`} Only name and email are required. Clients you import start as “Invited” until they accept.</p>
     </div>
   );
 }

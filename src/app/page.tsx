@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { PLANS } from '@/lib/plans';
+import { FEATURES, FOUNDING, PLANS, foundingOpen } from '@/lib/plans';
 
 const features = [
   ['Client management', 'Profiles, onboarding, goals, measurements, progress photos and subscription status in one place.'],
@@ -31,7 +31,7 @@ export default function Home() {
           <Link href="/signup" className="btn-primary px-6 py-3 text-base">Start 14-day free trial</Link>
           <a href="#pricing" className="btn-secondary px-6 py-3 text-base">See pricing</a>
         </div>
-        <p className="mt-3 text-sm text-slate-500">No card needed. Up to 10 clients during your trial.</p>
+        <p className="mt-3 text-sm text-slate-500">No card needed. Unlimited clients during your trial.</p>
       </section>
 
       <section className="mx-auto grid max-w-6xl gap-4 px-6 pb-16 sm:grid-cols-2 lg:grid-cols-3">
@@ -43,20 +43,18 @@ export default function Home() {
         ))}
       </section>
 
-      <section id="pricing" className="mx-auto max-w-5xl px-6 pb-24">
-        <h2 className="mb-6 text-center text-2xl">Simple pricing. No add-ons.</h2>
-        <div className="grid gap-4 sm:grid-cols-3">
-          {Object.entries(PLANS).map(([key, p]) => (
-            <div key={key} className={`card text-center ${key === 'growth' ? 'ring-2 ring-brand-500' : ''}`}>
-              <div className="font-semibold">{p.name}</div>
-              <div className="mt-2 text-4xl font-bold">£{p.priceGbp}<span className="text-base font-normal text-slate-500">/mo</span></div>
-              <div className="mt-1 text-sm text-slate-600">Up to {p.clientLimit} clients</div>
-              <ul className="mt-4 space-y-1 text-sm text-slate-600">
-                <li>Every feature included</li><li>AI coaching assistant</li><li>Retention dashboard</li>
-              </ul>
-              <Link href="/signup" className="btn-primary mt-5 w-full">Start free trial</Link>
-            </div>
-          ))}
+      <section id="pricing" className="mx-auto max-w-3xl px-6 pb-24">
+        <h2 className="mb-2 text-center text-2xl">One price. Everything included.</h2>
+        <p className="mb-8 text-center text-slate-600">No tiers, no per-client fees, no add-ons.</p>
+        <div className="card mx-auto max-w-md border-brand-200 p-6 text-center shadow-glow">
+          <div className="font-semibold">{PLANS.pro.name}</div>
+          <div className="mt-2 text-5xl font-bold tracking-tight">£{PLANS.pro.priceGbp}<span className="text-base font-normal text-slate-500">/month</span></div>
+          {foundingOpen() && <div className="mt-2 inline-flex rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-100">Founding coaches: £{FOUNDING.priceGbp}/month for life. First {FOUNDING.spots} only.</div>}
+          <ul className="mt-6 space-y-2 text-left text-sm text-slate-700">
+            {FEATURES.map((f) => <li key={f} className="flex gap-2"><span className="text-emerald-400">✓</span>{f}</li>)}
+          </ul>
+          <Link href="/signup" className="btn-primary mt-6 w-full">Start 14-day free trial</Link>
+          <p className="mt-2 text-xs text-slate-500">No card needed for the trial.</p>
         </div>
       </section>
 

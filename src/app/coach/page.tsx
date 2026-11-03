@@ -10,6 +10,7 @@ import { loadDashboard, recommendedAction } from '@/lib/dashboard-data';
 import { DAYS, relativeDay } from '@/lib/coaching';
 import { aiEnabled } from '@/lib/ai';
 import { gbp, timeAgo } from '@/lib/format';
+import { isUnlimited } from '@/lib/plans';
 
 function greeting() {
   const h = Number(new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hour12: false, timeZone: 'Europe/London' }).format(new Date()));
@@ -67,7 +68,7 @@ export default async function CoachDashboard({ searchParams }: { searchParams: P
         <>
           <div className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
             <Metric label="Active clients" icon="clients" value={d.stats.active} href="/coach/clients"
-              sub={<>{d.invited.length > 0 ? `${d.invited.length} invited · ` : ''}{coach.client_limit - d.clients.length} places free</>} />
+              sub={<>{d.invited.length > 0 ? `${d.invited.length} invited · ` : ''}{isUnlimited(coach.client_limit) ? `${d.paying.length} paying` : `${coach.client_limit - d.clients.length} places free`}</>} />
             <Metric label="Monthly revenue" icon="pound" tone="pink" value={gbp(d.mrr)} href="/coach/analytics"
               sub={d.revenueAtRisk > 0 ? <span className="text-red-700">{gbp(d.revenueAtRisk)} at risk</span> : `${d.paying.length} paying client${d.paying.length === 1 ? '' : 's'}`} />
             <Metric label="Check-ins this week" icon="checkins" tone="blue" href="/coach/checkins"

@@ -123,7 +123,7 @@ async function main() {
   if (cuErr || !coachUser.user) throw cuErr ?? new Error('coach not created');
   const coachId = coachUser.user.id;
   await must(admin.from('coaches').update({
-    plan: 'pro', client_limit: 75, subscription_status: 'active', trial_ends_at: new Date(Date.now() + 3650 * DAY).toISOString(),
+    plan: 'pro', client_limit: 1000, subscription_status: 'active', trial_ends_at: new Date(Date.now() + 3650 * DAY).toISOString(),
     checkin_day: 0, email_digest: false,
     ai_voice_notes: "Warm, direct and upbeat. Short paragraphs. Use their first name. Celebrate one specific win, be honest about adherence, give 1-2 clear actions. Sign off '- Sam'.",
     checkin_questions: [{ id: 'q1', label: 'How was your digestion this week?', type: 'text' }, { id: 'q2', label: 'Anything coming up next week (holidays, events, busy work)?', type: 'text' }],

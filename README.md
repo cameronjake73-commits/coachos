@@ -19,7 +19,7 @@ The operating system for independent online fitness coaches: client management, 
 | Nutrition | Calories, macros, water, daily habits, notes | Shown on the home screen |
 | Messaging | Per-client chat. Check-in replies are posted to the chat too | Chat with coach, unread badge |
 | Progress | Trend charts, photos | Weight change, trend charts, then-vs-now photos |
-| Billing | Starter £29 (10 clients), Growth £49 (30), Pro £79 (75). 14-day free trial, then locked until a plan is chosen. Stripe Checkout + Billing Portal | — |
+| Billing | One plan: £199/month, unlimited clients, everything included. Optional founding-member price (£99/month for life, first 10 coaches). 14-day free trial, then locked until subscribed. Stripe Checkout + Billing Portal | — |
 | Emails | Invite emails, morning digest (check-ins waiting, clients at risk), new-message alerts | Invite, check-in reminder on the coach's check-in day, "coach replied" and new-message alerts |
 | Accounts | Sign-up, login, forgot/reset password, delete account (cancels Stripe, erases all data) | Invite sign-up, forgot/reset password, download my data |
 | Data rights | Download any client's data (JSON incl. photo links), delete client, delete account | Download my data |
@@ -33,8 +33,8 @@ Clients use a **mobile web app** at `/app`. They can "Add to Home Screen" (PWA m
 
 ### 1. Supabase
 1. Create a project at supabase.com. **Pick a UK/EU region** (e.g. London `eu-west-2`) for UK GDPR.
-2. SQL Editor → run `supabase/migrations/0001_schema.sql`, then `0002_seed_exercises.sql`, `0003_notifications.sql` and `0004_coaching_upgrade.sql` (in that order).
-   Already set up? Just run `0004_coaching_upgrade.sql` once. It only adds columns, nothing is deleted.
+2. SQL Editor → run `supabase/migrations/0001_schema.sql`, then `0002_seed_exercises.sql`, `0003_notifications.sql`, `0004_coaching_upgrade.sql` and `0005_single_plan.sql` (in that order).
+   Already set up? Run any of `0004_coaching_upgrade.sql` / `0005_single_plan.sql` you haven't run yet, once each. It only adds columns, nothing is deleted.
 3. Authentication → URL Configuration: set **Site URL** to your app URL and add `https://YOUR-DOMAIN/auth/callback` to Redirect URLs.
 4. Authentication → Providers → Email: keep "Confirm email" on for coaches. Clients are confirmed automatically via their invite link.
 5. Project Settings → API: copy the URL, `anon` key and `service_role` key.
@@ -49,7 +49,7 @@ Clients use a **mobile web app** at `/app`. They can "Add to Home Screen" (PWA m
 Create an API key at console.anthropic.com and set `ANTHROPIC_API_KEY`. `ANTHROPIC_MODEL` defaults to `claude-sonnet-5-5`. Each check-in analysis costs roughly £0.01–£0.03.
 
 ### 4. Stripe
-1. Products → create three monthly recurring prices in GBP: £29, £49, £79. Copy each `price_...` ID into `STRIPE_PRICE_STARTER/GROWTH/PRO`.
+1. Products → create one product with two monthly recurring GBP prices: £199 (`STRIPE_PRICE_PRO`) and £99 (`STRIPE_PRICE_FOUNDING`). Remove `STRIPE_PRICE_FOUNDING` (or set `FOUNDING_OFFER=off`) once your founding spots are filled; founding coaches keep their price.
 2. Settings → Billing → Customer portal: enable it and allow switching between those three prices and cancelling.
 3. Developers → Webhooks → add endpoint `https://YOUR-DOMAIN/api/stripe/webhook` with events `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`. Copy the signing secret into `STRIPE_WEBHOOK_SECRET`.
 4. Use **test mode** keys until you've tested a full signup → checkout → upgrade → cancel cycle.
