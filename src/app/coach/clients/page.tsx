@@ -74,7 +74,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
   return (
     <div className="mx-auto max-w-6xl space-y-5">
       <PageHeader title="Clients" description={`${used} of ${coach.client_limit} client places used`}
-        actions={<Link href="/coach/clients/new" className="btn-primary"><Icon name="plus" className="h-4 w-4" />Add client</Link>} />
+        actions={<><Link href="/coach/clients/import" className="btn-secondary"><Icon name="arrowUp" className="h-4 w-4" />Import</Link><Link href="/coach/clients/new" className="btn-primary"><Icon name="plus" className="h-4 w-4" />Add client</Link></>} />
 
       <div className="space-y-3">
         <form className="flex gap-2" role="search">
@@ -96,7 +96,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
       {list.length === 0 ? (
         <Card>
           {all.length === 0 ? (
-            <EmptyState icon="clients" title="No clients yet" action={<Link href="/coach/clients/new" className="btn-primary"><Icon name="plus" className="h-4 w-4" />Add your first client</Link>}>
+            <EmptyState icon="clients" title="No clients yet" action={<div className="flex flex-wrap justify-center gap-2"><Link href="/coach/clients/new" className="btn-primary"><Icon name="plus" className="h-4 w-4" />Add your first client</Link><Link href="/coach/clients/import" className="btn-secondary">Import from a spreadsheet</Link></div>}>
               Add a client and send them their invite link. They get their own app for workouts, check-ins and messages.
             </EmptyState>
           ) : <EmptyState icon="search" title={q ? `No clients match “${q}”` : 'No clients here'}>{filter !== 'current' && <Link href="/coach/clients" className="link">Show all clients</Link>}</EmptyState>}

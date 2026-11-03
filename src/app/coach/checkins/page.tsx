@@ -98,6 +98,7 @@ export default async function CheckinsPage({ searchParams }: { searchParams: Pro
               })}
             </ul>
           )}
+          {view === 'missed' && missed.length > 1 && <div className="border-t border-slate-200 px-4 py-3 md:px-5"><Link href="/coach/messages/broadcast?to=missed" className="btn-secondary btn-sm"><Icon name="send" className="h-4 w-4" />Nudge all {missed.length}</Link></div>}
           {view === 'waiting' && <p className="border-t border-slate-200 px-4 py-3 text-xs text-slate-500 md:px-5">Clients can check in from {DAYS[(coach.checkin_day + 4) % 7]}. Anyone still not in after {DAYS[coach.checkin_day]} moves to Missed.</p>}
         </Card>
       )}

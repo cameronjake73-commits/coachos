@@ -182,3 +182,62 @@ export async function deleteClientData(formData: FormData) {
   if (client?.user_id) await createAdminClient().auth.admin.deleteUser(client.user_id);
   redirect('/coach/clients?flash=deleted');
 }
+
+/** Bulk import from the CSV wizard. Re-validates every row, skips existing emails and respects the plan limit. */
+export async function importClients(formData: FormData) {
+  const { supabase, coach } = await requireCoach();
+  type Row = { full_name: string; email: string; phone: string | null; goal: string | null; monthly_fee: number | null; renewal_date: string | null; start_date: string | null; notes: string | null };
+  let rows: Row[] = [];
+  try { rows = JSON.parse(String(formData.get('rows') ?? '[]')); } catch { redirect('/coach/clients/import?error=Could not read the import. Please try again.'); }
+  const isDate = (v: unknown) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
+  const clean = rows.slice(0, 500).map((r) => ({
+    full_name: String(r.full_name ?? '').trim().slice(0, 120),
+    email: String(r.email ?? '').trim().toLowerCase().slice(0, 200),
+    phone: r.phone ? String(r.phone).slice(0, 40) : null,
+    goal: r.goal ? String(r.goal).slice(0, 300) : null,
+    monthly_fee: typeof r.monthly_fee === 'number' && r.monthly_fee >= 0 && r.monthly_fee <= 100000 ? r.monthly_fee : null,
+    renewal_date: isDate(r.renewal_date),
+    start_date: isDate(r.start_date) ?? new Date().toISOString().slice(0, 10),
+    notes: r.notes ? String(r.notes).slice(0, 5000) : null,
+  })).filter((r) => r.full_name && EMAIL.test(r.email));
+
+  const [{ data: existing }, { count }] = await Promise.all([
+    supabase.from('clients').select('email').eq('coach_id', coach.id),
+    supabase.from('clients').select('id', { count: 'exact', head: true }).eq('coach_id', coach.id).neq('status', 'archived'),
+  ]);
+  const taken = new Set((existing ?? []).map((c) => c.email.toLowerCase()));
+  const unique = clean.filter((r) => (taken.has(r.email) ? false : (taken.add(r.email), true)));
+  const room = Math.max(0, coach.client_limit - (count ?? 0));
+  const batch = unique.slice(0, room);
+  if (!batch.length) redirect(`/coach/clients/import?error=${encodeURIComponent(room === 0 ? 'You have no client places left. Upgrade in Billing or archive a client.' : 'No new clients to import. They may already be in COACHOS.')}`);
+
+  const { data: inserted, error } = await supabase.from('clients').insert(batch.map((r) => ({ ...r, coach_id: coach.id, status: 'invited' }))).select('id, email');
+  if (error) redirect(`/coach/clients/import?error=${encodeURIComponent(friendly(error.message))}`);
+  await supabase.from('invites').insert((inserted ?? []).map((c) => ({ client_id: c.id, coach_id: coach.id, email: c.email })));
+  if (formData.get('send_email') === 'on') {
+    const ids = (inserted ?? []).map((c) => c.id);
+    after(async () => { for (const id of ids) { try { await notifyInvite(id); } catch (e) { console.error('invite email failed', e); } } });
+  }
+  const n = inserted?.length ?? 0;
+  const skipped = clean.length - n;
+  redirect(`/coach/clients?filter=invited&flash=${encodeURIComponent(`${n} client${n === 1 ? '' : 's'} imported${skipped ? `, ${skipped} skipped` : ''}`)}`);
+}
+
+/** Sends the same (personalised) message to many clients as individual private messages. */
+export async function sendBroadcast(formData: FormData) {
+  const { supabase, coach } = await requireCoach();
+  const { broadcastAudience } = await import('@/lib/broadcast');
+  const body = String(formData.get('body') ?? '').trim().slice(0, 3000);
+  const audience = String(formData.get('audience') ?? 'active');
+  if (!body) redirect('/coach/messages/broadcast?error=Write a message first');
+  const all = await broadcastAudience(supabase, coach.id, coach.checkin_day);
+  const picked = new Set(formData.getAll('client_id').map(String));
+  const to = audience === 'pick' ? all.filter((c) => picked.has(c.id)) : all.filter((c) => c.groups.includes(audience as 'active'));
+  if (!to.length) redirect('/coach/messages/broadcast?error=No clients selected');
+  const rows = to.slice(0, 300).map((c) => ({ client_id: c.id, coach_id: coach.id, sender: 'coach', body: body.replace(/\{first_name\}/gi, c.full_name.split(' ')[0]) }));
+  const { error } = await supabase.from('messages').insert(rows);
+  if (error) redirect(`/coach/messages/broadcast?error=${encodeURIComponent(error.message)}`);
+  const ids = rows.map((r) => r.client_id);
+  after(async () => { for (const id of ids) { try { await notifyNewMessage(id, 'coach'); } catch (e) { console.error('broadcast email failed', e); } } });
+  redirect(`/coach/messages?flash=${encodeURIComponent(`Sent to ${rows.length} client${rows.length === 1 ? '' : 's'}`)}`);
+}

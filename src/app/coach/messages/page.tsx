@@ -113,7 +113,7 @@ export default async function MessagesInbox({ searchParams }: { searchParams: Pr
   return (
     <div className="mx-auto max-w-6xl space-y-4">
       <AutoRefresh seconds={20} />
-      <div className={selected ? 'hidden md:block' : ''}><PageHeader title="Messages" /></div>
+      <div className={selected ? 'hidden md:block' : ''}><PageHeader title="Messages" actions={<Link href="/coach/messages/broadcast" className="btn-secondary"><Icon name="send" className="h-4 w-4" />Message several</Link>} /></div>
       <div className="card-flush overflow-hidden md:grid md:h-[calc(100vh-200px)] md:min-h-[520px] md:grid-cols-[320px_1fr]">
         <div className={`${selected ? 'hidden md:block' : ''} md:border-r md:border-slate-200`}>{list}</div>
         <div className={selected ? '' : 'hidden md:flex md:items-center md:justify-center'}>
