@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 
 const MESSAGES: Record<string, string> = {
   saved: 'Changes saved',
@@ -22,7 +22,6 @@ const MESSAGES: Record<string, string> = {
 /** Shows a short confirmation toast for `?flash=<key>` and then removes the param from the URL. */
 export function Flash() {
   const sp = useSearchParams();
-  const router = useRouter();
   const path = usePathname();
   const key = sp.get('flash');
   const [msg, setMsg] = useState<string | null>(null);
@@ -33,7 +32,8 @@ export function Flash() {
     const next = new URLSearchParams(sp.toString());
     next.delete('flash');
     const qs = next.toString();
-    router.replace(qs ? `${path}?${qs}` : path, { scroll: false });
+    // Tidy the URL without asking the server for the page again (router.replace would re-render it).
+    window.history.replaceState(null, '', qs ? `${path}?${qs}` : path);
     const t = setTimeout(() => setMsg(null), 3200);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps

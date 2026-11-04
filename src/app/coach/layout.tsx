@@ -6,20 +6,20 @@ import { CoachNav, MobileNav } from '@/components/coach-nav';
 import { Avatar } from '@/components/avatar';
 import { Icon } from '@/components/icons';
 import { Flash } from '@/components/flash';
+import { PendingButton } from '@/components/form-bits';
 import { signOut } from '@/app/login/actions';
 import { daysUntil } from '@/lib/format';
 
 export default async function CoachLayout({ children }: { children: React.ReactNode }) {
-  const { supabase, coach, user } = await requireCoach();
-  const [{ count: pending }, { count: unread }, { data: profile }] = await Promise.all([
+  const { supabase, coach, user, fullName } = await requireCoach();
+  const [{ count: pending }, { count: unread }] = await Promise.all([
     supabase.from('checkins').select('id', { count: 'exact', head: true }).eq('coach_id', coach.id).eq('status', 'submitted'),
     supabase.from('messages').select('id', { count: 'exact', head: true }).eq('coach_id', coach.id).eq('sender', 'client').is('read_at', null),
-    supabase.from('profiles').select('full_name').eq('id', user.id).single(),
   ]);
   const path = (await headers()).get('x-pathname') || '';
   const locked = coachIsLocked(coach) && !path.startsWith('/coach/billing') && !path.startsWith('/coach/settings');
   const trialDays = coach.plan === 'trial' ? Math.max(daysUntil(coach.trial_ends_at) ?? 0, 0) : null;
-  const name = profile?.full_name || coach.business_name || 'Coach';
+  const name = fullName || coach.business_name || 'Coach';
   const counts = { pendingCheckins: pending ?? 0, unreadMessages: unread ?? 0 };
   const notifications = counts.pendingCheckins + counts.unreadMessages;
 
@@ -50,7 +50,7 @@ export default async function CoachLayout({ children }: { children: React.ReactN
               <div className="truncate text-[13px] font-semibold">{name}</div>
               <div className="truncate text-xs text-slate-500">{coach.business_name || 'Coach'}</div>
             </div>
-            <form action={signOut}><button title="Sign out" aria-label="Sign out" className="icon-btn h-8 w-8"><Icon name="logout" className="h-4 w-4" /></button></form>
+            <form action={signOut}><PendingButton title="Sign out" aria-label="Sign out" className="icon-btn h-8 w-8"><Icon name="logout" className="h-4 w-4" /></PendingButton></form>
           </div>
         </div>
       </aside>
@@ -91,7 +91,7 @@ export default async function CoachLayout({ children }: { children: React.ReactN
           <div className="flex items-center gap-3">
             <Avatar name={name} size={36} />
             <div className="min-w-0 flex-1"><div className="truncate text-sm font-semibold">{name}</div><div className="truncate text-xs text-slate-500">{user.email}</div></div>
-            <form action={signOut}><button className="btn-secondary btn-sm"><Icon name="logout" className="h-4 w-4" />Sign out</button></form>
+            <form action={signOut}><PendingButton className="btn-secondary btn-sm" pendingLabel="Signing out…"><Icon name="logout" className="h-4 w-4" />Sign out</PendingButton></form>
           </div>
         </div>
       } />

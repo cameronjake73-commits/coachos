@@ -2,7 +2,7 @@
 
 The operating system for independent online fitness coaches: client management, workout programming, weekly check-ins, an AI coaching assistant, a client retention dashboard and a mobile web app for clients.
 
-**Stack:** Next.js 15 (App Router) · Supabase (Postgres, Auth, Storage, row-level security) · Stripe (coach subscriptions) · Anthropic API (AI assistant) · Tailwind CSS. Deploys to Vercel.
+**Stack:** Next.js 16 (App Router) · Supabase (Postgres, Auth, Storage, row-level security) · Stripe (coach subscriptions) · Anthropic API (AI assistant) · Tailwind CSS. Deploys to Vercel.
 
 ---
 

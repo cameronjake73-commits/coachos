@@ -8,8 +8,10 @@ import { gbp } from '@/lib/format';
 
 export default async function Analytics() {
   const { supabase, coach } = await requireCoach();
-  const d = await loadDashboard(supabase, coach.id, coach.checkin_day);
-  const { data: all } = await supabase.from('clients').select('*').eq('coach_id', coach.id);
+  const [d, { data: all }] = await Promise.all([
+    loadDashboard(supabase, coach.id, coach.checkin_day),
+    supabase.from('clients').select('*').eq('coach_id', coach.id),
+  ]);
   const eng12 = weeklyEngagement(d.checkins, 12);
   const now = Date.now(), W = 7 * 86_400_000;
   const completion: number[] = [];

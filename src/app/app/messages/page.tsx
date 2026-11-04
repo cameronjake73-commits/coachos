@@ -9,8 +9,8 @@ export default async function ClientMessages() {
   const [{ data: msgs }, { data: coach }] = await Promise.all([
     supabase.from('messages').select('id, sender, body, created_at, read_at').eq('client_id', client.id).order('created_at', { ascending: false }).limit(200),
     supabase.from('coaches').select('business_name').eq('id', client.coach_id).single(),
+    supabase.from('messages').update({ read_at: new Date().toISOString() }).eq('client_id', client.id).eq('sender', 'coach').is('read_at', null),
   ]);
-  await supabase.from('messages').update({ read_at: new Date().toISOString() }).eq('client_id', client.id).eq('sender', 'coach').is('read_at', null);
   const coachName = coach?.business_name || 'Your coach';
   return (
     <div className="space-y-3">

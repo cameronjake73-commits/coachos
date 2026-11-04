@@ -1,3 +1,4 @@
+import { PendingButton } from '@/components/form-bits';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { requireCoach } from '@/lib/auth';
@@ -224,7 +225,7 @@ export default async function CheckinReview({ params, searchParams }: { params: 
                   {ai?.draft_reply && <p className="text-xs text-slate-500">Drafted by AI from their data. Edit it so it sounds like you, then send.</p>}
                   <div className="flex flex-col gap-2 sm:flex-row">
                     <SubmitButton className="btn-primary flex-1" pendingText="Sending…"><Icon name="send" className="h-4 w-4" />Send reply</SubmitButton>
-                    <button formAction={markReviewed} className="btn-secondary">Mark reviewed</button>
+                    <PendingButton formAction={markReviewed} className="btn-secondary" pendingLabel="Saving…">Mark reviewed</PendingButton>
                   </div>
                   <p className="text-2xs text-slate-500">Sent to their app{cl.email_reminders ? ' and by email' : ''}. Then the next check-in opens.</p>
                 </form>

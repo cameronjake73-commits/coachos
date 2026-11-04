@@ -36,8 +36,10 @@ export default async function MessagesInbox({ searchParams }: { searchParams: Pr
 
   let convo: React.ReactNode = null;
   if (selected) {
-    const { data: thread } = await supabase.from('messages').select('id, sender, body, created_at, read_at').eq('client_id', selected.id).order('created_at', { ascending: false }).limit(200);
-    await supabase.from('messages').update({ read_at: new Date().toISOString() }).eq('client_id', selected.id).eq('sender', 'client').is('read_at', null);
+    const [{ data: thread }] = await Promise.all([
+      supabase.from('messages').select('id, sender, body, created_at, read_at').eq('client_id', selected.id).order('created_at', { ascending: false }).limit(200),
+      supabase.from('messages').update({ read_at: new Date().toISOString() }).eq('client_id', selected.id).eq('sender', 'client').is('read_at', null),
+    ]);
     const t = byClient.get(selected.id);
     if (t) t.unread = 0;
     const draft = sp.draft === 'ai' && selected.ai_draft ? selected.ai_draft : '';
@@ -56,7 +58,7 @@ export default async function MessagesInbox({ searchParams }: { searchParams: Pr
         <div className="flex-1 px-4 pb-4 pt-2">
           <Conversation
             tall messages={(thread ?? []).reverse()} me="coach" action={sendCoachMessage}
-            hidden={{ client_id: selected.id, back, ...(draft ? { used_draft: '1' } : {}) }} draft={draft}
+            hidden={{ client_id: selected.id, ...(draft ? { used_draft: '1' } : {}) }} draft={draft} afterSend={draft ? back : undefined}
             placeholder={`Message ${selected.full_name.split(' ')[0]}…`}
             emptyText={`Say hello to ${selected.full_name.split(' ')[0]}. They'll see it in their app.`}
             composerNote={aiEnabled() && !draft ? (

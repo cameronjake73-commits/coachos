@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useNavPath } from './nav-path';
 import { useEffect, useState } from 'react';
 import { Icon } from './icons';
 
@@ -26,12 +27,12 @@ const countFor = (it: Item, c: Counts) => (it.badge === 'checkins' ? c.pendingCh
 
 /** Desktop sidebar navigation. */
 export function CoachNav(counts: Counts) {
-  const path = usePathname();
+  const { path, tap } = useNavPath();
   const link = (it: Item) => {
     const active = isActive(path, it.href);
     const count = countFor(it, counts);
     return (
-      <Link key={it.href} href={it.href} aria-current={active ? 'page' : undefined}
+      <Link key={it.href} href={it.href} onClick={tap(it.href)} aria-current={active ? 'page' : undefined}
         className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${active
           ? 'bg-brand-50 text-slate-900 shadow-[inset_0_0_0_1px_rgba(124,92,255,0.28)]'
           : 'text-slate-600 hover:bg-slate-100/70 hover:text-slate-900'}`}>
@@ -52,9 +53,10 @@ export function CoachNav(counts: Counts) {
 
 /** Phone navigation: bottom tab bar for the main sections plus a "More" sheet for the rest. */
 export function MobileNav({ counts, footer }: { counts: Counts; footer?: React.ReactNode }) {
-  const path = usePathname();
+  const realPath = usePathname();
+  const { path, tap } = useNavPath();
   const [open, setOpen] = useState(false);
-  useEffect(() => setOpen(false), [path]);
+  useEffect(() => setOpen(false), [realPath]);
   useEffect(() => {
     document.body.style.overflow = open ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
@@ -73,8 +75,8 @@ export function MobileNav({ counts, footer }: { counts: Counts; footer?: React.R
             const count = countFor(it, counts);
             return (
               <li key={it.href}>
-                <Link href={it.href} aria-current={active ? 'page' : undefined}
-                  className={`relative flex h-[58px] flex-col items-center justify-center gap-1 text-[11px] font-medium ${active ? 'text-slate-900' : 'text-slate-500'}`}>
+                <Link href={it.href} onClick={tap(it.href)} aria-current={active ? 'page' : undefined}
+                  className={`tap relative flex h-[58px] flex-col items-center justify-center gap-1 text-[11px] font-medium ${active ? 'text-slate-900' : 'text-slate-500'}`}>
                   <span className={`relative flex h-7 w-12 items-center justify-center rounded-full transition ${active ? 'bg-brand-50 text-brand-300' : ''}`}>
                     <Icon name={it.icon} className="h-[22px] w-[22px]" strokeWidth={active ? 2 : 1.8} />
                     {count > 0 && <span className={`num absolute -right-0.5 -top-1 min-w-[18px] rounded-full px-1 text-center text-[10px] font-semibold leading-[18px] text-white ring-2 ring-[#0c0d17] ${it.badge === 'messages' ? 'bg-red-500' : 'bg-brand-600'}`}>{count > 99 ? '99+' : count}</span>}
@@ -86,7 +88,7 @@ export function MobileNav({ counts, footer }: { counts: Counts; footer?: React.R
           })}
           <li>
             <button type="button" onClick={() => setOpen(true)} aria-expanded={open} aria-haspopup="dialog"
-              className={`flex h-[58px] w-full flex-col items-center justify-center gap-1 text-[11px] font-medium ${moreActive ? 'text-slate-900' : 'text-slate-500'}`}>
+              className={`tap flex h-[58px] w-full flex-col items-center justify-center gap-1 text-[11px] font-medium ${moreActive ? 'text-slate-900' : 'text-slate-500'}`}>
               <span className={`flex h-7 w-12 items-center justify-center rounded-full ${moreActive ? 'bg-brand-50 text-brand-300' : ''}`}><Icon name="menu" className="h-[22px] w-[22px]" /></span>
               More
             </button>
@@ -108,7 +110,7 @@ export function MobileNav({ counts, footer }: { counts: Counts; footer?: React.R
                 const active = isActive(path, it.href);
                 return (
                   <li key={it.href}>
-                    <Link href={it.href} className={`flex flex-col items-center gap-2 rounded-2xl border px-2 py-4 text-[13px] font-medium ${active ? 'border-brand-500/50 bg-brand-50 text-slate-900' : 'border-slate-200 bg-slate-100/40 text-slate-700'}`}>
+                    <Link href={it.href} onClick={(e) => { tap(it.href)(e); setOpen(false); }} className={`tap flex flex-col items-center gap-2 rounded-2xl border px-2 py-4 text-[13px] font-medium ${active ? 'border-brand-500/50 bg-brand-50 text-slate-900' : 'border-slate-200 bg-slate-100/40 text-slate-700'}`}>
                       <Icon name={it.icon} className={`h-6 w-6 ${active ? 'text-brand-300' : 'text-slate-500'}`} />
                       {it.label}
                     </Link>

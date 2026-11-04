@@ -64,3 +64,13 @@ export function ScrollBottom({ children, className }: { children: React.ReactNod
   useEffect(() => { if (ref.current) ref.current.scrollTop = ref.current.scrollHeight; });
   return <div ref={ref} className={className}>{children}</div>;
 }
+
+/** Submit button that reacts the instant it's pressed (dims and pulses while the server finishes). */
+export function PendingButton({ children, className = 'btn-secondary', pendingLabel, disabled, ...rest }: React.ButtonHTMLAttributes<HTMLButtonElement> & { pendingLabel?: React.ReactNode }) {
+  const { pending } = useFormStatus();
+  return (
+    <button type="submit" {...rest} className={`${className} ${pending ? 'animate-pulse opacity-60' : ''}`} disabled={pending || disabled} aria-busy={pending || undefined}>
+      {pending && pendingLabel ? pendingLabel : children}
+    </button>
+  );
+}

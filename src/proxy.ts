@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   // Not configured yet (no Supabase env vars): let public pages render instead of crashing every request.
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return NextResponse.next();
   const headers = new Headers(request.headers);
@@ -22,9 +22,13 @@ export async function middleware(request: NextRequest) {
       },
     },
   );
-  let user = null;
+  // getClaims verifies the login token locally when the project uses JWT signing keys (no auth-server round trip),
+  // and still refreshes an expiring session.
+  let user: { id: string; user_metadata?: { role?: string } } | null = null;
   try {
-    ({ data: { user } } = await supabase.auth.getUser());
+    const { data } = await supabase.auth.getClaims();
+    const c = data?.claims as { sub?: string; user_metadata?: { role?: string } } | undefined;
+    if (c?.sub) user = { id: c.sub, user_metadata: c.user_metadata };
   } catch (e) {
     console.error('auth check failed', e);
   }
@@ -37,7 +41,7 @@ export async function middleware(request: NextRequest) {
   }
   // Send people to their own side without a page render (saves a round trip when the home-screen app opens /app).
   if (user) {
-    const role = (user.user_metadata as { role?: string } | undefined)?.role;
+    const role = user.user_metadata?.role;
     const to = path === '/app' && role === 'coach' ? '/coach' : path === '/coach' && role === 'client' ? '/app' : null;
     if (to) {
       const url = request.nextUrl.clone();

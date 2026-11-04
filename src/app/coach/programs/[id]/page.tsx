@@ -4,7 +4,7 @@ import { requireCoach } from '@/lib/auth';
 import { Badge, Card, EmptyState } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { SubmitButton } from '@/components/submit-button';
-import { AutoSaveForm, ConfirmButton } from '@/components/form-bits';
+import { AutoSaveForm, ConfirmButton, PendingButton } from '@/components/form-bits';
 import { ExercisePicker } from '@/components/exercise-picker';
 import {
   addExerciseToWorkout, addWorkout, assignTemplate, deleteProgram, deleteWorkout, duplicateProgram, duplicateWorkout,
@@ -91,12 +91,12 @@ export default async function ProgramBuilder({ params }: { params: Promise<{ id:
                 {(['up', 'down'] as const).map((dir) => (
                   <form key={dir} action={moveWorkout}>
                     <input type="hidden" name="workout_id" value={w.id} /><input type="hidden" name="program_id" value={id} /><input type="hidden" name="dir" value={dir} />
-                    <button disabled={dir === 'up' ? wi === 0 : wi === workouts.length - 1} className={iconBtn} aria-label={`Move day ${dir}`}><Icon name={dir === 'up' ? 'chevronUp' : 'chevronDown'} className="h-4 w-4" /></button>
+                    <PendingButton disabled={dir === 'up' ? wi === 0 : wi === workouts.length - 1} className={iconBtn} aria-label={`Move day ${dir}`}><Icon name={dir === 'up' ? 'chevronUp' : 'chevronDown'} className="h-4 w-4" /></PendingButton>
                   </form>
                 ))}
                 <form>
                   <input type="hidden" name="workout_id" value={w.id} /><input type="hidden" name="program_id" value={id} />
-                  <button formAction={duplicateWorkout} className={iconBtn} aria-label="Duplicate day" title="Duplicate day"><Icon name="copy" className="h-4 w-4" /></button>
+                  <PendingButton formAction={duplicateWorkout} className={iconBtn} aria-label="Duplicate day" title="Duplicate day"><Icon name="copy" className="h-4 w-4" /></PendingButton>
                   <ConfirmButton formAction={deleteWorkout} message={`Remove “${w.name}” and its exercises?`} className={iconBtn}><Icon name="trash" className="h-4 w-4" /><span className="sr-only">Remove day</span></ConfirmButton>
                 </form>
               </div>
@@ -112,12 +112,12 @@ export default async function ProgramBuilder({ params }: { params: Promise<{ id:
                       {(['up', 'down'] as const).map((dir) => (
                         <form key={dir} action={moveWorkoutExercise}>
                           <input type="hidden" name="id" value={we.id} /><input type="hidden" name="program_id" value={id} /><input type="hidden" name="dir" value={dir} />
-                          <button disabled={dir === 'up' ? i === 0 : i === (w.workout_exercises?.length ?? 0) - 1} className={iconBtn} aria-label={`Move ${we.exercises?.name} ${dir}`}><Icon name={dir === 'up' ? 'chevronUp' : 'chevronDown'} className="h-4 w-4" /></button>
+                          <PendingButton disabled={dir === 'up' ? i === 0 : i === (w.workout_exercises?.length ?? 0) - 1} className={iconBtn} aria-label={`Move ${we.exercises?.name} ${dir}`}><Icon name={dir === 'up' ? 'chevronUp' : 'chevronDown'} className="h-4 w-4" /></PendingButton>
                         </form>
                       ))}
                       <form action={removeWorkoutExercise}>
                         <input type="hidden" name="id" value={we.id} /><input type="hidden" name="program_id" value={id} />
-                        <button className={`${iconBtn} hover:text-red-700`} aria-label={`Remove ${we.exercises?.name}`}><Icon name="x" className="h-4 w-4" /></button>
+                        <PendingButton className={`${iconBtn} hover:text-red-700`} aria-label={`Remove ${we.exercises?.name}`}><Icon name="x" className="h-4 w-4" /></PendingButton>
                       </form>
                     </div>
                   </div>

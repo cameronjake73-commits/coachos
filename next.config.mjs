@@ -1,6 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: { serverActions: { bodySizeLimit: '25mb' } }, // progress photo uploads
+  experimental: {
+    serverActions: { bodySizeLimit: '25mb' }, // progress photo uploads
+  },
   async headers() {
     return [{
       source: '/(.*)',
