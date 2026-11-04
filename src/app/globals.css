@@ -48,3 +48,28 @@
   .row-link { @apply transition-colors hover:bg-raised; }
   .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
 }
+
+/* ------------------------------------------------------------------ opening animation */
+#splash { position: fixed; inset: 0; z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; background: #0a0b13; animation: splash-out .5s cubic-bezier(.4,0,.2,1) 2.05s forwards; }
+.splash-seen #splash { display: none; }
+.splash-glow { position: absolute; width: 340px; height: 340px; border-radius: 9999px; background: radial-gradient(circle, rgba(124,92,255,.45), rgba(124,92,255,0) 65%); opacity: 0; transform: scale(.6); animation: splash-glow 1.6s ease-out .35s forwards; }
+.splash-mark { position: relative; transform: scale(.55) translateY(10px); opacity: 0; animation: splash-pop .75s cubic-bezier(.2,1.4,.4,1) .1s forwards; filter: drop-shadow(0 10px 30px rgba(124,92,255,.55)); }
+.splash-outline { stroke-dasharray: 100; stroke-dashoffset: 100; animation: splash-draw .7s ease-out .15s forwards; }
+.splash-fill { opacity: 0; animation: splash-fade .45s ease-out .55s forwards; }
+.splash-cut { transform-origin: 32px 46px; transform: scale(0); animation: splash-cut .45s cubic-bezier(.2,1.5,.4,1) .7s forwards; }
+.splash-word { position: relative; display: flex; gap: .14em; font-size: 26px; font-weight: 800; letter-spacing: .02em; color: #f5f6fa; }
+.splash-word span { display: inline-block; opacity: 0; transform: translateY(12px); animation: splash-letter .45s cubic-bezier(.2,.9,.3,1) forwards; }
+.splash-bar { position: relative; width: 120px; height: 3px; border-radius: 9999px; background: rgba(255,255,255,.08); overflow: hidden; opacity: 0; animation: splash-fade .3s ease-out 1.1s forwards; }
+.splash-bar span { position: absolute; inset: 0; transform-origin: left; transform: scaleX(0); background: linear-gradient(90deg, #7c5cff, #b9a8ff); animation: splash-load .9s cubic-bezier(.6,0,.2,1) 1.15s forwards; }
+@keyframes splash-pop { to { transform: none; opacity: 1; } }
+@keyframes splash-draw { to { stroke-dashoffset: 0; } }
+@keyframes splash-fade { to { opacity: 1; } }
+@keyframes splash-cut { to { transform: scale(1); } }
+@keyframes splash-letter { to { opacity: 1; transform: none; } }
+@keyframes splash-glow { 50% { opacity: 1; transform: scale(1.05); } to { opacity: .55; transform: scale(1); } }
+@keyframes splash-load { to { transform: scaleX(1); } }
+@keyframes splash-out { to { opacity: 0; visibility: hidden; transform: scale(1.04); } }
+@media (prefers-reduced-motion: reduce) {
+  #splash { animation: splash-out .3s ease .6s forwards; }
+  #splash *, #splash span { animation: none !important; opacity: 1 !important; transform: none !important; stroke-dashoffset: 0 !important; }
+}
