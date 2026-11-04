@@ -35,6 +35,18 @@ export async function middleware(request: NextRequest) {
     url.searchParams.set('next', path);
     return NextResponse.redirect(url);
   }
+  // Send people to their own side without a page render (saves a round trip when the home-screen app opens /app).
+  if (user) {
+    const role = (user.user_metadata as { role?: string } | undefined)?.role;
+    const to = path === '/app' && role === 'coach' ? '/coach' : path === '/coach' && role === 'client' ? '/app' : null;
+    if (to) {
+      const url = request.nextUrl.clone();
+      url.pathname = to;
+      const r = NextResponse.redirect(url);
+      response.cookies.getAll().forEach((c) => r.cookies.set(c));
+      return r;
+    }
+  }
   return response;
 }
 
