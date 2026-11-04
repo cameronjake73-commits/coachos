@@ -35,3 +35,14 @@ export function coachIsLocked(coach: Coach) {
   if (coach.plan === 'trial') return new Date(coach.trial_ends_at).getTime() < Date.now();
   return !active;
 }
+
+/** Sends someone who is already logged in straight to their side of the app (used by the landing, login and signup pages). */
+export async function redirectIfSignedIn() {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return;
+  let role: 'coach' | 'client' | null = null;
+  try {
+    const r = await getUserAndRole();
+    if (r.user) role = r.role ?? 'coach';
+  } catch { return; }
+  if (role) redirect(role === 'client' ? '/app' : '/coach');
+}

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { redirectIfSignedIn } from '@/lib/auth';
 import { FEATURES, FOUNDING, PLANS, foundingOpen } from '@/lib/plans';
 
 const features = [
@@ -10,7 +11,8 @@ const features = [
   ['Client app', 'A mobile web app your clients add to their home screen. No App Store downloads.'],
 ];
 
-export default function Home() {
+export default async function Home() {
+  await redirectIfSignedIn();
   return (
     <main>
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">

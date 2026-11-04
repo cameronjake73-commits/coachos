@@ -1,8 +1,10 @@
 import Link from 'next/link';
+import { redirectIfSignedIn } from '@/lib/auth';
 import { login } from './actions';
 import { SubmitButton } from '@/components/submit-button';
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string; message?: string; next?: string }> }) {
+  await redirectIfSignedIn();
   const sp = await searchParams;
   return (
     <main className="flex min-h-screen items-center justify-center p-6">
