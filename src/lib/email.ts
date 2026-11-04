@@ -6,7 +6,7 @@ const APP = () => process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
 export async function sendEmail(to: string, subject: string, html: string) {
   const key = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM || 'COACHOS <notifications@example.com>';
+  const from = process.env.EMAIL_FROM || 'COACHOS <onboarding@resend.dev>'; // resend.dev only delivers to your own Resend login email: set EMAIL_FROM once your domain is verified
   if (!key) { console.info(`[email skipped: no RESEND_API_KEY] to=${to} subject=${subject}`); return false; }
   try {
     const res = await fetch('https://api.resend.com/emails', {
