@@ -9,6 +9,8 @@ const features = [
   ['AI coaching assistant', 'Summaries, week-on-week comparisons, flagged concerns and a drafted reply in your voice. You approve everything.'],
   ['Retention dashboard', 'See who is slipping before they cancel: missed check-ins, skipped workouts, overdue payments, renewals.'],
   ['Client app', 'A mobile web app your clients add to their home screen. No App Store downloads.'],
+  ['Boundaries built in', 'Set working hours. Clients see when you reply and get an automatic message after hours, and you get no pings at night.'],
+  ['Saved replies', 'Answer the questions you get every week in one tap, including a polite script for things outside your remit.'],
 ];
 
 export default async function Home() {

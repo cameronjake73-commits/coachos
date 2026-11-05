@@ -60,11 +60,19 @@ export const emails = {
     html: layout(`New message`, `<p>Hi ${esc(p.toName.split(' ')[0])}, you have a new message from ${esc(p.fromName)}.</p>`,
       { label: 'Open messages', url: p.forCoach ? `${APP()}/coach/clients/${p.clientId}?tab=messages` : `${APP()}/app/messages` }),
   }),
-  coachDigest: (p: { coachName: string; pending: number; atRisk: { name: string; reason: string }[]; overdue: number }) => ({
-    subject: `${p.pending} check-in${p.pending === 1 ? '' : 's'} to review${p.atRisk.length ? ` · ${p.atRisk.length} client${p.atRisk.length === 1 ? ' needs' : 's need'} you` : ''}`,
+  coachDigest: (p: { coachName: string; pending: number; atRisk: { name: string; reason: string }[]; overdue: number; unread?: number }) => {
+    const parts = [
+      p.pending ? `${p.pending} check-in${p.pending === 1 ? '' : 's'} to review` : '',
+      p.unread ? `${p.unread} unread message${p.unread === 1 ? '' : 's'}` : '',
+      p.atRisk.length ? `${p.atRisk.length} client${p.atRisk.length === 1 ? ' needs' : 's need'} you` : '',
+    ].filter(Boolean);
+    return {
+    subject: parts.join(' · ') || 'Your COACHOS summary',
     html: layout(`Good morning ${p.coachName.split(' ')[0]}`,
       `<p><strong>${p.pending}</strong> check-in${p.pending === 1 ? '' : 's'} waiting for review${p.overdue ? ` and <strong>${p.overdue}</strong> overdue` : ''}.</p>
+       ${p.unread ? `<p><strong>${p.unread}</strong> unread message${p.unread === 1 ? '' : 's'} from clients, including any sent outside your working hours.</p>` : ''}
        ${p.atRisk.length ? `<p style="margin-bottom:4px"><strong>Clients at risk:</strong></p><ul style="padding-left:18px;margin-top:0">${p.atRisk.slice(0, 8).map((c) => `<li>${esc(c.name)}: ${esc(c.reason)}</li>`).join('')}</ul>` : ''}`,
       { label: 'Open dashboard', url: `${APP()}/coach` }, 'Your daily COACHOS summary.'),
-  }),
+    };
+  },
 };

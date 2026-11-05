@@ -7,6 +7,11 @@ import { deleteCoachAccount, saveSettings } from './actions';
 import { aiEnabled } from '@/lib/ai';
 import { DAYS } from '@/lib/coaching';
 import { MEASUREMENTS } from '@/lib/types';
+import { QuickReplyEditor } from '@/components/quick-reply-editor';
+import { DEFAULT_AUTO_REPLY, fmtTime, hoursFrom } from '@/lib/hours';
+
+const TIMES = Array.from({ length: 38 }, (_, i) => { const m = 300 + i * 30; return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`; });
+const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const sp = await searchParams;
@@ -15,6 +20,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const ai = aiEnabled();
   const emailOn = Boolean(process.env.RESEND_API_KEY);
   const measured = new Set(coach.checkin_measurements ?? ['waist']);
+  const hours = hoursFrom(coach);
+  const hoursReady = coach.hours_days !== undefined; // migration 0006 has been run
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
@@ -55,6 +62,48 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             </div>
           </div>
         </Card>
+
+        <section id="hours" className="scroll-mt-24">
+          <Card title="Working hours & boundaries" description="Clients see when you reply, get an automatic message out of hours, and you stop getting pinged at night.">
+            {!hoursReady ? (
+              <Alert tone="amber" title="One quick setup step">Run <code className="rounded bg-black/30 px-1">supabase/migrations/0006_boundaries.sql</code> in Supabase → SQL Editor to switch this on.</Alert>
+            ) : (
+              <div className="space-y-5">
+                <Toggle name="hours_enabled" defaultChecked={coach.hours_enabled} label="Use working hours" description="Outside these times clients see you're offline and when you'll be back. No message emails reach you out of hours; they're in your morning summary instead." />
+                <fieldset>
+                  <legend className="label">Days you reply</legend>
+                  <div className="flex flex-wrap gap-2">
+                    {DAY_ORDER.map((d) => (
+                      <label key={d} className="flex min-h-[44px] min-w-[52px] cursor-pointer items-center justify-center rounded-xl border border-slate-200 px-3 text-sm font-medium has-[:checked]:border-brand-500/60 has-[:checked]:bg-brand-50 has-[:checked]:text-slate-900 md:min-h-[38px]">
+                        <input type="checkbox" name={`hd_${d}`} defaultChecked={hours.days.includes(d)} className="sr-only" />{DAYS[d].slice(0, 3)}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+                <div className="grid grid-cols-2 gap-3 sm:max-w-md">
+                  <Field label="From"><select name="hours_start" defaultValue={hours.start} className="input">{TIMES.map((t) => <option key={t} value={t}>{fmtTime(t)}</option>)}</select></Field>
+                  <Field label="Until"><select name="hours_end" defaultValue={hours.end} className="input">{TIMES.map((t) => <option key={t} value={t}>{fmtTime(t)}</option>)}</select></Field>
+                </div>
+                <Field label="You reply within" hint="Shown to clients in their chat, so they know what to expect." className="sm:max-w-xs">
+                  <select name="reply_within_hours" defaultValue={String(hours.replyWithin)} className="input">
+                    {[[2, '2 hours'], [4, '4 hours'], [12, '12 hours'], [24, '1 working day'], [48, '2 working days']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                  </select>
+                </Field>
+                <div className="space-y-3 rounded-xl border border-slate-200 p-3">
+                  <Toggle name="auto_reply_enabled" defaultChecked={coach.auto_reply_enabled ?? true} label="Automatic out-of-hours reply" description="Sent once when a client messages while you're offline, then not again until you've replied." />
+                  <Field label="Auto-reply message" hint="{name} becomes their first name; {next} becomes when you're back, e.g. “tomorrow at 9am”.">
+                    <textarea name="auto_reply_text" rows={3} maxLength={1000} className="input" defaultValue={coach.auto_reply_text ?? ''} placeholder={DEFAULT_AUTO_REPLY} />
+                  </Field>
+                </div>
+                <div>
+                  <div className="label">Saved replies</div>
+                  <p className="hint mb-2 mt-0">Answer common messages in one tap from any chat. Includes a polite script for things outside your remit.</p>
+                  <QuickReplyEditor initial={coach.quick_replies ?? []} />
+                </div>
+              </div>
+            )}
+          </Card>
+        </section>
 
         <Card title="Notifications">
           <Toggle name="email_digest" defaultChecked={coach.email_digest} label="Morning summary email" description="When check-ins are waiting or clients are at risk." />

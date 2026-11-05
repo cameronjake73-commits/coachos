@@ -96,7 +96,7 @@ export async function draftAndSave(supabase: SupabaseClient, coach: Coach, clien
   const [{ data: last }, { data: lastMsg }, { data: coachMsgs }] = await Promise.all([
     supabase.from('checkins').select('*').eq('client_id', clientId).order('submitted_at', { ascending: false }).limit(1),
     supabase.from('messages').select('created_at').eq('client_id', clientId).eq('sender', 'client').order('created_at', { ascending: false }).limit(1),
-    supabase.from('messages').select('body').eq('coach_id', coach.id).eq('sender', 'coach').order('created_at', { ascending: false }).limit(3),
+    supabase.from('messages').select('*').eq('coach_id', coach.id).eq('sender', 'coach').order('created_at', { ascending: false }).limit(8),
   ]);
   const lastCi = (last?.[0] ?? null) as Checkin | null;
   const days = (d?: string | null) => (d ? Math.floor((Date.now() - new Date(d).getTime()) / DAY) : null);
@@ -108,7 +108,7 @@ export async function draftAndSave(supabase: SupabaseClient, coach: Coach, clien
     lastCheckin: lastCi ? slimCheckin(lastCi) : null,
     daysSinceLastCheckin: days(lastCi?.submitted_at), daysSinceLastMessage: days(lastMsg?.[0]?.created_at),
     paymentOverdue: client.payment_status === 'overdue',
-    coachVoice: coach.ai_voice_notes, recentCoachMessages: (coachMsgs ?? []).map((m) => (m.body as string).replace(/^Check-in feedback:\s*/, '')),
+    coachVoice: coach.ai_voice_notes, recentCoachMessages: (coachMsgs ?? []).filter((m) => !m.is_auto).slice(0, 3).map((m) => (m.body as string).replace(/^Check-in feedback:\s*/, '')),
   });
   await supabase.from('clients').update({ ai_draft: message, ai_draft_at: new Date().toISOString() }).eq('id', clientId);
   await logEvent(supabase, coach.id, clientId, 'outreach_draft', process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5');

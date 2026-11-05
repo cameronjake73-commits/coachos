@@ -33,8 +33,8 @@ Clients use a **mobile web app** at `/app`. They can "Add to Home Screen" (PWA m
 
 ### 1. Supabase
 1. Create a project at supabase.com. **Pick a UK/EU region** (e.g. London `eu-west-2`) for UK GDPR.
-2. SQL Editor → run `supabase/migrations/0001_schema.sql`, then `0002_seed_exercises.sql`, `0003_notifications.sql`, `0004_coaching_upgrade.sql` and `0005_single_plan.sql` (in that order).
-   Already set up? Run any of `0004_coaching_upgrade.sql` / `0005_single_plan.sql` you haven't run yet, once each. It only adds columns, nothing is deleted.
+2. SQL Editor → run `supabase/migrations/0001_schema.sql`, then `0002_seed_exercises.sql`, `0003_notifications.sql`, `0004_coaching_upgrade.sql`, `0005_single_plan.sql` and `0006_boundaries.sql` (in that order).
+   Already set up? Run any of `0004_coaching_upgrade.sql` / `0005_single_plan.sql` / `0006_boundaries.sql` you have not run yet, once each. It only adds columns, nothing is deleted.
 3. Authentication → URL Configuration: set **Site URL** to your app URL and add `https://YOUR-DOMAIN/auth/callback` to Redirect URLs.
 4. Authentication → Providers → Email: keep "Confirm email" on for coaches. Clients are confirmed automatically via their invite link.
 5. Project Settings → API: copy the URL, `anon` key and `service_role` key.

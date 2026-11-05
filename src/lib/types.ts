@@ -110,6 +110,15 @@ export interface Coach {
   checkin_measurements: string[];
   email_digest: boolean;
   ai_brief: AiBrief | null;
+  // Working hours & boundaries (migration 0006; may be missing on older databases)
+  hours_enabled?: boolean;
+  hours_days?: number[];
+  hours_start?: string;
+  hours_end?: string;
+  reply_within_hours?: number;
+  auto_reply_enabled?: boolean;
+  auto_reply_text?: string | null;
+  quick_replies?: { title: string; body: string }[];
 }
 
 export interface Exercise {

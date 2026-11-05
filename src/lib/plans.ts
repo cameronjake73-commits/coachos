@@ -35,4 +35,5 @@ export const FEATURES = [
   'Programme builder and exercise library',
   'Progress photos, measurements and timelines',
   'Spreadsheet import and group messages',
+  'Working hours, auto-replies and saved replies',
 ];

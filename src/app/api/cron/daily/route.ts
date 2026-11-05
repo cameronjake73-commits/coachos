@@ -53,16 +53,17 @@ export async function GET(request: Request) {
 
     // 3. Digest
     if (coach.email_digest && profile?.email && !(coach.last_digest_at && coach.last_digest_at > hoursAgo(20))) {
-      const [{ count: pending }, { data: risky }, { data: lastCis }] = await Promise.all([
+      const [{ count: pending }, { data: risky }, { data: lastCis }, { count: unread }] = await Promise.all([
         admin.from('checkins').select('id', { count: 'exact', head: true }).eq('coach_id', coach.id).eq('status', 'submitted'),
         admin.from('clients').select('full_name, risk_reasons').eq('coach_id', coach.id).eq('status', 'active').eq('risk_level', 'high').order('risk_score', { ascending: false }),
         admin.from('checkins').select('client_id, submitted_at').eq('coach_id', coach.id).gte('submitted_at', hoursAgo(8 * 24)),
+        admin.from('messages').select('id', { count: 'exact', head: true }).eq('coach_id', coach.id).eq('sender', 'client').is('read_at', null),
       ]);
       const recent = new Set((lastCis ?? []).map((r) => r.client_id));
       const overdue = (clients ?? []).filter((c) => c.status === 'active' && c.user_id && !recent.has(c.id)).length;
-      if ((pending ?? 0) > 0 || (risky?.length ?? 0) > 0) {
+      if ((pending ?? 0) > 0 || (risky?.length ?? 0) > 0 || (unread ?? 0) > 0) {
         const e = emails.coachDigest({
-          coachName: profile.full_name || 'Coach', pending: pending ?? 0, overdue,
+          coachName: profile.full_name || 'Coach', pending: pending ?? 0, overdue, unread: unread ?? 0,
           atRisk: (risky ?? []).map((r) => ({ name: r.full_name, reason: (r.risk_reasons as string[])[0] ?? 'Engagement dropping' })),
         });
         if (await sendEmail(profile.email, e.subject, e.html)) stats.digests++;

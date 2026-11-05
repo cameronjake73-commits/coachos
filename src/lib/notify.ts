@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server';
 import { emails, sendEmail } from '@/lib/email';
+import { coachAvailable } from '@/lib/boundaries';
 
 async function ctx(clientId: string) {
   const admin = createAdminClient();
@@ -44,6 +45,8 @@ export async function notifyNewMessage(clientId: string, sender: 'coach' | 'clie
     const e = emails.newMessage({ toName: c.client.full_name, fromName: c.coachName, forCoach: false });
     await sendEmail(c.client.email, e.subject, e.html);
   } else if (c.coachEmail) {
+    // Respect the coach's working hours: out-of-hours messages wait for the morning summary instead.
+    if (!(await coachAvailable(c.admin, c.client.coach_id))) return;
     const e = emails.newMessage({ toName: c.coachPerson, fromName: c.client.full_name, forCoach: true, clientId });
     await sendEmail(c.coachEmail, e.subject, e.html);
   }

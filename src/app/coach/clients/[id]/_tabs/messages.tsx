@@ -7,12 +7,13 @@ import { Conversation } from '@/components/conversation';
 import { generateDraft, sendCoachMessage } from '../../actions';
 import { draftOutreach } from '@/lib/dashboard-data';
 import { aiEnabled } from '@/lib/ai';
+import { quickRepliesFrom } from '@/lib/hours';
 import type { CheckinStatus } from '@/lib/coaching';
 import type { Client, Coach } from '@/lib/types';
 
 export async function MessagesTab({ supabase, coach, client, draftMode, status }: { supabase: SupabaseClient; coach: Coach; client: Client; draftMode?: string; status?: CheckinStatus }) {
   const [{ data: msgs }, { data: me }] = await Promise.all([
-    supabase.from('messages').select('id, sender, body, created_at, read_at').eq('client_id', client.id).order('created_at', { ascending: false }).limit(200),
+    supabase.from('messages').select('*').eq('client_id', client.id).order('created_at', { ascending: false }).limit(200),
     supabase.from('profiles').select('full_name').eq('id', coach.id).single(),
   ]);
   await supabase.from('messages').update({ read_at: new Date().toISOString() }).eq('client_id', client.id).eq('sender', 'client').is('read_at', null);
@@ -28,6 +29,7 @@ export async function MessagesTab({ supabase, coach, client, draftMode, status }
       <Conversation
         messages={(msgs ?? []).reverse()} me="coach" action={sendCoachMessage}
         hidden={{ client_id: client.id, ...(draft ? { used_draft: '1' } : {}) }}
+        quickReplies={quickRepliesFrom(coach.quick_replies)} firstName={client.full_name.split(' ')[0]}
         draft={draft} placeholder={archived ? 'This client is archived' : `Message ${client.full_name.split(' ')[0]}…`}
         emptyText={`Start the conversation with ${client.full_name.split(' ')[0]}. They'll get it in their app${client.email_reminders ? ' and by email' : ''}.`}
         composerNote={

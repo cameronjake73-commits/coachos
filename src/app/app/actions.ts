@@ -7,6 +7,7 @@ import { recomputeRisk } from '@/lib/risk-service';
 import { afterCheckinSubmitted } from '@/lib/auto-analyze';
 import { createAdminClient } from '@/lib/supabase/server';
 import { notifyNewMessage } from '@/lib/notify';
+import { maybeAutoReply } from '@/lib/boundaries';
 
 const n = (f: FormData, k: string) => { const v = String(f.get(k) ?? '').trim(); return v === '' ? null : Number(v); };
 const t = (f: FormData, k: string) => { const v = String(f.get(k) ?? '').trim(); return v === '' ? null : v.slice(0, 4000); };
@@ -97,7 +98,9 @@ export async function sendClientMessage(formData: FormData) {
   const { supabase, client } = await requireClient();
   const body = String(formData.get('body') ?? '').trim().slice(0, 5000);
   if (body) {
-    await supabase.from('messages').insert({ client_id: client.id, coach_id: client.coach_id, sender: 'client', body });
+    const { error } = await supabase.from('messages').insert({ client_id: client.id, coach_id: client.coach_id, sender: 'client', body });
+    if (error) throw new Error("Message didn't send");
+    await maybeAutoReply(createAdminClient(), client);
     after(() => notifyNewMessage(client.id, 'client'));
   }
   revalidatePath('/app/messages');

@@ -2,6 +2,9 @@
 import { redirect } from 'next/navigation';
 import { requireCoach } from '@/lib/auth';
 import { MEASUREMENTS, type CheckinQuestion } from '@/lib/types';
+import { quickRepliesFrom } from '@/lib/hours';
+
+const safeJson = (v: FormDataEntryValue | null) => { try { return JSON.parse(String(v ?? '[]')); } catch { return []; } };
 
 const TYPES = ['text', 'scale', 'yesno'];
 
@@ -30,6 +33,25 @@ export async function saveSettings(formData: FormData) {
     supabase.from('profiles').update({ full_name: fullName }).eq('id', user.id),
   ]);
   if (e1 || e2) redirect(`/coach/settings?error=${encodeURIComponent((e1 ?? e2)!.message)}`);
+
+  // Working hours & boundaries: saved separately so the rest still saves before migration 0006 is run.
+  if (formData.has('hours_start')) {
+    const days = [0, 1, 2, 3, 4, 5, 6].filter((d) => formData.get(`hd_${d}`) === 'on');
+    const t = (k: string, fb: string) => { const v = String(formData.get(k) ?? ''); return /^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? v : fb; };
+    const start = t('hours_start', '09:00'), end = t('hours_end', '18:00');
+    const enabled = formData.get('hours_enabled') === 'on';
+    if (enabled && !days.length) redirect('/coach/settings?error=Pick at least one day you reply#hours');
+    if (enabled && start >= end) redirect('/coach/settings?error=Your finish time needs to be after your start time#hours');
+    const within = Number(formData.get('reply_within_hours'));
+    const { error } = await supabase.from('coaches').update({
+      hours_enabled: enabled, hours_days: days.length ? days : [1, 2, 3, 4, 5], hours_start: start, hours_end: end,
+      reply_within_hours: [2, 4, 12, 24, 48].includes(within) ? within : 24,
+      auto_reply_enabled: formData.get('auto_reply_enabled') === 'on',
+      auto_reply_text: String(formData.get('auto_reply_text') ?? '').trim().slice(0, 1000) || null,
+      quick_replies: quickRepliesFrom(safeJson(formData.get('quick_replies_json'))),
+    }).eq('id', coach.id);
+    if (error) redirect(`/coach/settings?error=${encodeURIComponent(error.message)}`);
+  }
   redirect('/coach/settings?flash=saved');
 }
 

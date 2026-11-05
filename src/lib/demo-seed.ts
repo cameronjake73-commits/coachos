@@ -124,6 +124,15 @@ export async function seedDemo(client: SupabaseClient, opts: { coachEmail?: stri
     checkin_questions: [{ id: 'q1', label: 'How was your digestion this week?', type: 'text' }, { id: 'q2', label: 'Anything coming up next week (holidays, events, busy work)?', type: 'text' }],
     checkin_measurements: ['waist', 'hips'],
   }).eq('id', coachId).select('id'), 'update coach');
+  // Working hours & saved replies (needs migration 0006; skipped quietly on older databases)
+  await admin.from('coaches').update({
+    hours_enabled: true, hours_days: [1, 2, 3, 4, 5], hours_start: '09:00', hours_end: '18:00', reply_within_hours: 24, auto_reply_enabled: true,
+    quick_replies: [
+      { title: 'Got it', body: "Got it {name}, thanks for letting me know. I'll factor that into your plan." },
+      { title: 'Missed session', body: "No stress about missing a session, {name}. Don't try to make it up, just pick things back up with your next workout." },
+      { title: 'Outside my remit', body: "I really appreciate you telling me, {name}. This is outside what I can help with as your coach, so please speak to your GP, who can point you to the right support. I'm still here for your training and nutrition, and we'll keep this week simple." },
+    ],
+  }).eq('id', coachId);
 
   // Exercise lookup
   const exRows = await must(admin.from('exercises').select('id, name').is('coach_id', null), 'exercises');

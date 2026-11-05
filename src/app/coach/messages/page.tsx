@@ -8,16 +8,17 @@ import { Conversation } from '@/components/conversation';
 import { SubmitButton } from '@/components/submit-button';
 import { generateDraft, sendCoachMessage } from '../clients/actions';
 import { aiEnabled } from '@/lib/ai';
+import { hoursFrom, isOpen, nextOpenText, quickRepliesFrom } from '@/lib/hours';
 import { timeAgo } from '@/lib/format';
 import type { RiskLevel } from '@/lib/types';
 
-type Thread = { id: string; full_name: string; status: string; risk_level: RiskLevel; last: { body: string; sender: string; created_at: string } | null; unread: number };
+type Thread = { id: string; full_name: string; status: string; risk_level: RiskLevel; last: { body: string; sender: string; created_at: string; is_auto?: boolean } | null; unread: number };
 
 export default async function MessagesInbox({ searchParams }: { searchParams: Promise<{ c?: string; q?: string; draft?: string }> }) {
   const sp = await searchParams;
   const { supabase, coach } = await requireCoach();
   const [{ data: msgs }, { data: clients }] = await Promise.all([
-    supabase.from('messages').select('client_id, sender, body, created_at, read_at').eq('coach_id', coach.id).order('created_at', { ascending: false }).limit(2000),
+    supabase.from('messages').select('*').eq('coach_id', coach.id).order('created_at', { ascending: false }).limit(2000),
     supabase.from('clients').select('id, full_name, status, risk_level, ai_draft, ai_draft_at, email_reminders').eq('coach_id', coach.id).neq('status', 'archived').order('full_name'),
   ]);
   const byClient = new Map<string, Thread>();
@@ -37,7 +38,7 @@ export default async function MessagesInbox({ searchParams }: { searchParams: Pr
   let convo: React.ReactNode = null;
   if (selected) {
     const [{ data: thread }] = await Promise.all([
-      supabase.from('messages').select('id, sender, body, created_at, read_at').eq('client_id', selected.id).order('created_at', { ascending: false }).limit(200),
+      supabase.from('messages').select('*').eq('client_id', selected.id).order('created_at', { ascending: false }).limit(200),
       supabase.from('messages').update({ read_at: new Date().toISOString() }).eq('client_id', selected.id).eq('sender', 'client').is('read_at', null),
     ]);
     const t = byClient.get(selected.id);
@@ -59,6 +60,7 @@ export default async function MessagesInbox({ searchParams }: { searchParams: Pr
           <Conversation
             tall messages={(thread ?? []).reverse()} me="coach" action={sendCoachMessage}
             hidden={{ client_id: selected.id, ...(draft ? { used_draft: '1' } : {}) }} draft={draft} afterSend={draft ? back : undefined}
+            quickReplies={quickRepliesFrom(coach.quick_replies)} firstName={selected.full_name.split(' ')[0]}
             placeholder={`Message ${selected.full_name.split(' ')[0]}…`}
             emptyText={`Say hello to ${selected.full_name.split(' ')[0]}. They'll see it in their app.`}
             composerNote={aiEnabled() && !draft ? (
@@ -92,7 +94,7 @@ export default async function MessagesInbox({ searchParams }: { searchParams: Pr
                   <span className="shrink-0 text-2xs text-slate-500">{timeAgo(t.last!.created_at)}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className={`min-w-0 flex-1 truncate text-[13px] ${t.unread ? 'text-slate-800' : 'text-slate-500'}`}>{t.last!.sender === 'coach' ? 'You: ' : ''}{t.last!.body.replace(/^Check-in feedback:\s*/, '').replace(/\s+/g, ' ')}</span>
+                  <span className={`min-w-0 flex-1 truncate text-[13px] ${t.unread ? 'text-slate-800' : 'text-slate-500'}`}>{t.last!.is_auto ? 'Auto-reply: ' : t.last!.sender === 'coach' ? 'You: ' : ''}{t.last!.body.replace(/^Check-in feedback:\s*/, '').replace(/\s+/g, ' ')}</span>
                   {t.unread > 0 && <span className="num rounded-full bg-red-500 px-1.5 text-2xs font-semibold leading-5 text-white">{t.unread}</span>}
                 </div>
               </div>
@@ -112,10 +114,15 @@ export default async function MessagesInbox({ searchParams }: { searchParams: Pr
     </div>
   );
 
+  const hours = hoursFrom(coach);
+  const offNote = !hours.enabled ? undefined : isOpen(hours)
+    ? 'You’re in working hours.'
+    : `You’re offline until ${nextOpenText(hours)}. Clients get your auto-reply${coach.auto_reply_enabled === false ? ' (turned off)' : ''}.`;
+
   return (
     <div className="mx-auto max-w-6xl space-y-4">
       <AutoRefresh seconds={20} />
-      <div className={selected ? 'hidden md:block' : ''}><PageHeader title="Messages" actions={<Link href="/coach/messages/broadcast" className="btn-secondary"><Icon name="send" className="h-4 w-4" />Message several</Link>} /></div>
+      <div className={selected ? 'hidden md:block' : ''}><PageHeader title="Messages" description={offNote} actions={<Link href="/coach/messages/broadcast" className="btn-secondary"><Icon name="send" className="h-4 w-4" />Message several</Link>} /></div>
       <div className="card-flush overflow-hidden md:grid md:h-[calc(100vh-200px)] md:min-h-[520px] md:grid-cols-[320px_1fr]">
         <div className={`${selected ? 'hidden md:block' : ''} md:border-r md:border-slate-200`}>{list}</div>
         <div className={selected ? '' : 'hidden md:flex md:items-center md:justify-center'}>
